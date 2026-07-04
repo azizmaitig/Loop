@@ -1,297 +1,133 @@
-# agent-loop -- Context
+# agent-loop — v4 Architecture
 
-## Terminology
-
-| Term | Definition |
-|------|------------|
-| agent-loop | Official project name. Bun/TS orchestrator, zero runtime deps. |
-| phase | One step in the 4-state machine lifecycle (init/run/verify/done). |
-| iteration | Full cycle through all 4 states. |
-| run | One `bun run loop.ts start` invocation from the CLI. |
-| loop | The orchestrator system itself: state machine + phase executor + persistence + safety. |
-| StateMachine | Flat-lookup 4-state, 6-event state machine. |
-| PhaseDef | Interface defining one shell command phase: `{ name, command, expectedExitCode, timeoutMs }`. |
-| STATE.md | Human-readable YAML frontmatter state file written to `_agent-loop-output/`. |
-| state.json | Machine-parseable JSON state file written alongside STATE.md. |
-| LoopState | Runtime representation of current state, iteration, phase results, errors. |
-| v1 invariant | No LLM, no MCP, no daemon, no YAML parser dep, no SQLite, no plugin system. |
-| memory | Collective term for v3's agentmemory integration layer: per-session persistence, lesson extraction, session archiving, health pulse. |
-| episodic save | One-time write of a session summary to agentmemory when the loop completes. Per-session (not per-iteration), fire-and-forget, no retry. Distinct from the per-transition filesystem persistence (STATE.md + state.json). |
-| lesson | A novel failure pattern extracted after a phase fails. Deduplicated by error content hash. Saved via agentmemory HTTP API. Serves as cross-session memory for future runs. |
-| session archive | Markdown file written to `70-Memory/history/{date-path}/{timestamp}-{taskName}.md` on loop completion. Format: YAML frontmatter + free-form markdown body (matching vault convention). Falls back to `_agent-loop-output/session-archive/` when vault path is unavailable. |
-| health pulse | Numeric score pushed to agentmemory on loop completion. Computed as `passingPhases / totalPhases` (0.0–1.0). Logged to console transparently so the user sees what factors contributed. |
-| memory transport | Raw HTTP (`fetch()` to `localhost:3111`) — NOT an MCP subprocess. Chosen over the existing `mcp.ts` infra because subprocess spawn adds latency and failure surface for a lightweight operation. See ADR-0001. |
-| memory hooks | Lifecycle callbacks in `loop.ts` that call agentmemory functions: `onLoopComplete` (episodic save + health pulse + session archive), `onPhaseFailed` (lesson extraction). All fire-and-forget — no await in the critical path, errors swallowed. Guarded by `memory.enabled: false` config flag. |
+Bun/TS loop orchestrator: 4-state machine, plugin phases, MCP execution, agentmemory hooks, HTTP/WS API. Zero runtime deps. ~1200 LOC (12 src files), 147 tests (11 test files).
 
 ## Architecture
 
+```mermaid
+mindmap
+  root((agent-loop v4))
+    Core Engine
+      index.ts
+      types.ts
+      state-machine.ts
+      state.ts
+      safety.ts
+      config.ts
+      plugins.ts
+    Infrastructure
+      mcp.ts
+      api.ts
+    Agentmemory
+      agentmemory.ts
+      memory-hooks.ts
+    Evaluation
+      evaluate.ts
 ```
-                         CLI args
-                            |
-                            v
-                   +------------------+
-                   |  loop.ts         |  entry point, arg parsing, phase resolution
-                   |  (main())        |
-                   +--------+---------+
-                            |
-                            v
-                   +------------------+
-                   |  StateMachine    |  4-state flat lookup
-                   |  (state-machine) |  6 events, TRANSITIONS[state][event]
-                   +--------+---------+
-                            |
-              +-------------+-------------+
-              |             |             |
-              v             v             v
-     +-------------+  +----------+  +----------+
-     | Phase       |  | State    |  | Safety   |
-     | Executor    |  | Persist  |  | Guards   |
-     | (loop.ts    |  | (state)  |  | (safety) |
-     |  shellCmd)  |  |          |  |          |
-     +------+------+  +-----+----+  +-----+----+
-            |                |              |
-            v                v              v
-     Bun.spawn          STATE.md        AbortController
-     cmd.exe /c         state.json      maxIterations cap
-                                        SIGINT handler
-```
+
+## Modules by Subsystem
+
+### Core Engine (7 files)
+| File | Role |
+|------|------|
+| index.ts | Barrel export (12 lines) |
+| types.ts | Core types: StateMachineState, PhaseDef, LoopConfig, PhaseResult, LoopState, LoopResult, Judgment |
+| state-machine.ts | 4-state (init/run/verify/done) × 6-event flat lookup, ~49 LOC |
+| state.ts | Dual persistence: STATE.md (YAML frontmatter) + state.json, custom YAML parser, ~147 LOC |
+| safety.ts | executeWithTimeout (AbortController), max iterations cap (20), SIGINT handler, ~73 LOC |
+| config.ts | DEFAULT_CONFIG, parseLoopArgs, mergeConfig (hard cap 20), ~81 LOC |
+| plugins.ts | Plugin interface, HookContext, loadPlugins (dynamic import), executeHooks at 5 lifecycle points, ~116 LOC |
+
+### Infrastructure (2 files)
+| File | Role |
+|------|------|
+| mcp.ts | MCP subprocess execution via JSON-RPC 2.0 over stdin/stdout, ~167 LOC |
+| api.ts | Bun.serve HTTP/WS server: GET /state, POST /start/stop/trigger, WebSocket broadcasts, ~103 LOC |
+
+### Agentmemory (2 files)
+| File | Role |
+|------|------|
+| agentmemory.ts | HTTP client to localhost:3111 (fetch), 5 endpoints: save, recall, archive, lesson, pulse, ~183 LOC |
+| memory-hooks.ts | Lifecycle callbacks: onLoopComplete, onPhaseFailed, logPhaseContext, ~194 LOC |
+
+### Evaluation (1 file)
+| File | Role |
+|------|------|
+| evaluate.ts | LLM-based semantic evaluation or exit-code fallback, Judgment type with passed/reason/confidence, ~81 LOC |
+
+## Data Flow
+
+1. CLI → config.ts parses args, merges with DEFAULT_CONFIG
+2. index.ts → state-machine.ts drives loop: execute phases → collect results → evaluate → persist → repeat or exit
+3. Each phase runs via mcp.ts (MCP subprocess) or evaluate.ts (LLM eval)
+4. state.ts persists after every transition (~6 writes per iteration)
+5. plugins.ts hooks into lifecycle — loadPlugins + executeHooks at 5 points
+6. memory-hooks.ts fires on completion/failure — fire-and-forget HTTP to agentmemory
+7. api.ts serves state over HTTP/WS when daemon mode is active
 
 ## State Machine
 
-4 states, 6 events, flat lookup table in `TRANSITIONS[state][event]`.
-
-### States
-
 ```
-  +-------+     +-------+     +---------+     +-------+
-  | init  | --> |  run  | --> | verify  | --> | done  |
-  +-------+     +-------+     +---------+     +-------+
-      ^                           |
-      +----- LOOP (all pass) -----+
+  init ──RUN──> run ──VERIFY──> verify ──COMPLETE──> done
+                   ^                  |
+                   └──── LOOP ────────┘
 ```
 
-### Transition Table
+| State | Events → Next |
+|-------|-------------|
+| init | RUN → run, ABORT → done |
+| run | VERIFY → verify, ABORT → done |
+| verify | COMPLETE → done, LOOP → init, FAILED → done, ABORT → done |
+| done | (terminal) |
 
-```typescript
-// src/state-machine.ts -- ponytail: flat lookup, no OOP pattern
-const TRANSITIONS = {
-  init:   { RUN: 'run',   ABORT: 'done' },
-  run:    { VERIFY: 'verify', ABORT: 'done' },
-  verify: { COMPLETE: 'done', LOOP: 'init', FAILED: 'done', ABORT: 'done' },
-  done:   {},
-};
-```
+## Key Decisions
 
-| Current State | Allowed Events | Next States |
-|---------------|---------------|-------------|
-| init | RUN, ABORT | run, done |
-| run | VERIFY, ABORT | verify, done |
-| verify | COMPLETE, LOOP, FAILED, ABORT | done, init, done, done |
-| done | (none, terminal) | -- |
+- **ADR-0001**: Raw HTTP (fetch to localhost:3111) over MCP subprocess for agentmemory — lower latency, smaller failure surface (`docs/adr/0001-raw-http-agentmemory-transport.md`)
+- **Custom YAML parser**: No js-yaml dep. state.ts parses YAML frontmatter + falls back to JSON
+- **Fire-and-forget memory ops**: All agentmemory calls are fire-and-forget with 2s timeout, no retry, errors swallowed
+- **Ponytail patterns**: Flat lookup state machine (no OOP), AbortController for timeouts, mutable global for SIGINT
 
-### API
+## Configuration
 
-- `StateMachine(initialState?)` -- constructor, defaults to `init`
-- `transition(event)` -- advances state, throws `StateMachineError` on invalid event
-- `allowedEvents()` -- returns `string[]` of valid events from current state
-- `isTerminal()` -- returns `true` when state is `done`
+| Key | Default | Description |
+|-----|---------|-------------|
+| maxIterations | 3 (cap 20) | Loop iterations |
+| task | "demo" | Task preset name |
+| phases | all | Comma-separated phase filter |
+| timeout | 30000 | Per-phase timeout ms |
+| memory.enabled | false | Enable agentmemory hooks |
+| port | 3000 | API server port |
+| plugins | [] | Plugin file paths |
 
-### 6 Events
+## Plugin System
 
-| Event | Meaning |
-|-------|---------|
-| RUN | Start executing phases |
-| VERIFY | Check phase results |
-| COMPLETE | All phases passed, no more iterations |
-| LOOP | All phases passed, more iterations remain |
-| FAILED | One or more phases did not pass |
-| ABORT | External or safety-triggered early exit |
+5 hook points: `beforePhase` / `afterPhase` / `beforeLoop` / `afterLoop` / `onError`. Plugins are dynamically imported modules exporting `createPlugin(): Plugin`. Used by memory-hooks internally; extensible for user plugins.
 
-## Phase Execution
+## Test Strategy
 
-Each phase is defined by `PhaseDef` and dispatched as a shell command.
+147 tests across 11 test files. Run: `bun test __tests__/`
 
-```typescript
-// src/types.ts
-interface PhaseDef {
-  name: string;            // human-readable label
-  command: string;         // shell command to run
-  expectedExitCode: number; // success code (typically 0)
-  timeoutMs: number;       // per-phase timeout
-}
-```
+| Area | Files |
+|------|-------|
+| State machine | state-machine.test.ts |
+| Persistence | state.test.ts |
+| Safety | safety.test.ts |
+| Config | config.test.ts |
+| MCP execution | mcp.test.ts |
+| Plugins | plugins.test.ts |
+| Agentmemory | agentmemory.test.ts |
+| Memory hooks | memory-hooks.test.ts |
+| API server | api.test.ts |
+| Evaluation | evaluate.test.ts |
+| Daemon | daemon.test.ts |
 
-Execution flow in `loop.ts`:
-
-1. Bun.spawn with `cmd.exe /c <command>` (Windows native shell)
-2. stdout and stderr collected via `Bun.readableStreamToText`
-3. Result wrapped in `PhaseResult`
-4. PhaseResult written to state via `updatePhaseResult()` (immutable spread)
-
-```typescript
-// src/types.ts
-interface PhaseResult {
-  status: 'pass' | 'fail' | 'error';
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-  durationMs: number;
-  evidencePath: string;
-}
-```
-
-The shell executor function `executeShellCommand` in `loop.ts` wraps `Bun.spawn` inside `executeWithTimeout` for cooperative cancellation via AbortSignal.
-
-## State Persistence
-
-Dual-file strategy for every state transition.
-
-### Files
-
-| File | Format | Purpose |
-|------|--------|---------|
-| `_agent-loop-output/STATE.md` | YAML frontmatter (---\nkey:val\n---) | Human-readable, git-diffable |
-| `_agent-loop-output/state.json` | JSON | Machine-parseable, script consumption |
-
-### Write-after-every-transition
-
-State is written at these checkpoints in `loop.ts`:
-
-1. Initial state (before any iteration)
-2. After transition to `run`
-3. After each phase execution
-4. After transition to `verify`
-5. After transition to `done` (COMPLETE, FAILED, LOOP reset)
-6. Final state at loop exit
-
-Total: approximately 6 writes per full iteration.
-
-### Custom YAML Parser
-
-No `js-yaml` dependency. `src/state.ts` contains a custom `serializeYamlFrontmatter` / `parseYamlFrontmatter` pair (~70 LOC) that handles:
-
-- Simple key:value strings
-- Quoted strings (single and double)
-- Numbers and booleans
-- Complex objects via JSON.parse (`phaseResults`, `errors`)
-
-Reading is fallback chained: try YAML frontmatter first, fall back to plain JSON parse.
-
-### API
-
-```typescript
-// src/state.ts
-readState(path: string): Promise<LoopState | null>
-writeState(path: string, state: LoopState): Promise<void>
-createInitialState(config: LoopConfig): LoopState
-updatePhaseResult(state: LoopState, phaseName: string, result: PhaseResult): LoopState
-```
-
-## Safety Layer
-
-Three independent safety mechanisms, all in `src/safety.ts` except SIGINT which lives in `loop.ts`.
-
-### Per-Phase Timeout
-
-- `executeWithTimeout(fn, timeoutMs, phaseName)` uses `AbortController` + `Promise.race`
-- On timeout: controller aborts, `PhaseTimeoutError` thrown
-- Timer is `.unref()`d to avoid keeping the process alive
-- Phase result captured as `{ status: 'error', stderr: 'Phase <name> timed out after <N>ms' }`
-
-```typescript
-// ponytail: AbortController, no custom timeout queue
-async function executeWithTimeout<T>(
-  fn: (signal: AbortSignal) => Promise<T>,
-  timeoutMs: number,
-  phaseName: string,
-): Promise<T>
-```
-
-### Max Iterations Guard
-
-- Hard cap of 20 in `mergeConfig()`: `Math.min(override.maxIterations, 20)`
-- `checkMaxIterations(currentIteration, maxIterations)` returns boolean
-- When cap reached, `MaxIterationsExceededError` thrown
-- Default max iterations is 3
-
-### SIGINT Handler
-
-- Mutable global ref `let sigintState: LoopState | null` updated on every state change
-- On SIGINT: sets `currentState = 'done'`, pushes error, writes both state files, exits code 1
-- Write is fire-and-forget (`.catch(() => {})` -- no await in sync handler)
-- State is always at most 1 phase behind (best-effort crash recovery)
-
-```typescript
-// loop.ts -- ponytail: mutable global, add actor model when multi-loop needed
-let sigintState: LoopState | null = null;
-
-process.on('SIGINT', () => {
-  if (sigintState) {
-    sigintState.currentState = 'done';
-    sigintState.errors.push('Aborted by user (SIGINT)');
-    writeBothStates(sigintState).catch(() => {});
-  }
-  process.exit(1);
-});
-```
-
-## CLI Usage
-
-All commands use `bun run loop.ts start` as the entry point.
+## Quick Start
 
 ```bash
-# 1. Run the demo task (scan, analyze, report; 1 iteration, 30s per phase)
-bun run loop.ts start --task demo
-
-# 2. Run with 2 iterations (loops back after all phases pass)
-bun run loop.ts start --task demo --max-iterations 2
-
-# 3. Run only specific phases from the demo task
-bun run loop.ts start --task demo --phases scan,report
-
-# 4. Override per-phase timeout to 2 minutes
-bun run loop.ts start --task demo --timeout 120000
-
-# 5. Force the loop to hang (for testing SIGINT crash safety)
-bun run loop.ts start --task demo --max-iterations 5 --timeout 60000
-
-# 6. Print help
-bun run loop.ts start --help
+bun run src/index.ts start --task demo                    # run demo
+bun run src/index.ts start --task demo --max-iterations 3  # 3 iterations
+bun run src/index.ts start --task demo --phases scan,report # filter phases
+bun run src/index.ts start --help                          # all options
 ```
 
-State output written to `_agent-loop-output/STATE.md` and `_agent-loop-output/state.json`.
-
-## v1 vs v2
-
-| Dimension | v1 (current) | v2 (planned) |
-|-----------|-------------|--------------|
-| LLM integration | None | Agent dispatch via MCP |
-| MCP servers | None | Configurable MCP tool dispatch |
-| Daemon | None | Persistent background process |
-| Plugin system | None | Phase-level plugins |
-| State persistence | Dual file (STATE.md + state.json) | Same, possibly plus DB |
-| Phase execution | Bun.spawn shell commands | Shell + MCP + LLM hybrid |
-| Scoring/evaluation | Pass/fail/error exit codes | Semantic evaluation, confidence |
-| YAML parser | Custom inline (~70 LOC) | Same or js-yaml |
-| Source LOC | ~330 (6 files) | 2000+ |
-| Dependencies | 3 devDeps (types, @types/*) | TBD |
-
-## File Listing
-
-```
-agent-loop/
-  package.json              -- runtime config (3 devDeps)
-  src/
-    index.ts                -- barrel export (6 lines)
-    types.ts                -- core types (StateMachineState, PhaseDef, LoopConfig, PhaseResult, LoopState, LoopResult)
-    state-machine.ts        -- 4-state flat lookup (~49 LOC)
-    state.ts                -- dual persistence (~147 LOC)
-    safety.ts               -- timeout + iteration guard (~73 LOC)
-    config.ts               -- default config + CLI arg parsing (~61 LOC)
-  loop.ts                   -- CLI entry point, shell executor, SIGINT handler (~318 LOC)
-  __tests__/
-    state-machine.test.ts   -- transition validation, allowed events, terminal state, invalid transitions
-    state.test.ts           -- read/write STATE.md, JSON fallback, createInitialState, updatePhaseResult
-    safety.test.ts          -- timeout enforcement, iteration limits
-    config.test.ts          -- CLI arg parsing, mergeConfig cap
-```
+State output: `_agent-loop-output/STATE.md` + `_agent-loop-output/state.json`.

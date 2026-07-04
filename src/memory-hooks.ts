@@ -7,8 +7,14 @@
  * @module memory-hooks
  */
 
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { PhaseDef, PhaseResult, LoopConfig, LoopState } from './types.js';
 import { saveEpisodic, archiveSession, saveLesson, pushPulse, recallLessons } from './agentmemory.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const VAULT_ROOT = resolve(__dirname, '../../..', '..'); // src/ → agent-loop/ → 11-Active/ → 10-Projects/ → vault root
+const DEFAULT_ARCHIVE_PATH = resolve(VAULT_ROOT, '70-Memory/history').replace(/\\/g, '/');
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -181,8 +187,8 @@ export async function onLoopComplete(
 
   const basePath =
     config.memory?.archivePath ||
-    '70-Memory/history'; /* ponytail: single vault default, make configurable when multi-vault needed */
+    DEFAULT_ARCHIVE_PATH; /* ponytail: single vault default, make configurable when multi-vault needed */
   const path = archiveFilePath(taskName, basePath);
   console.log('[memory-hooks] Archive:', path);
-  void archiveSession(state, taskName, basePath).catch(() => {});
+  await archiveSession(state, taskName, basePath).catch(() => {});
 }
