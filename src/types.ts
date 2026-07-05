@@ -140,6 +140,10 @@ export interface HistoryListResponse {
 
 export type ChildLoopStatus = 'stopped' | 'running' | 'error';
 
+export type TriggerDef =
+  | { type: 'cron'; expression: string }
+  | { type: 'fileWatch'; watchDir: string; pattern?: string };
+
 export interface ChildLoopDef {
   name: string;
   planPath: string;

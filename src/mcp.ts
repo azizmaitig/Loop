@@ -58,7 +58,7 @@ export async function executeMcpPhase(phase: PhaseDef): Promise<PhaseResult> {
       });
 
       // Write the JSON-RPC request to stdin and close
-      const writer = proc.stdin.getWriter();
+      const writer = (proc.stdin as any).getWriter();
       await writer.write(new TextEncoder().encode(request));
       await writer.close();
 

@@ -1,3 +1,4 @@
+import type { ServerWebSocket } from 'bun';
 import type { LoopState } from './types.js';
 
 export interface ApiServer {
@@ -33,7 +34,7 @@ export function startApiServer(
   port: number,
   handlers: ApiHandlers,
 ): ApiServer {
-  const clients = new Set<WebSocket>();
+  const clients = new Set<ServerWebSocket<undefined>>();
 
   const server = Bun.serve<undefined>({
     port,
@@ -89,7 +90,7 @@ export function startApiServer(
   });
 
   return {
-    port: server.port,
+    port: server.port!,
     stop: () => { server.stop(); },
     broadcast: (state: LoopState) => {
       const msg = JSON.stringify({ type: 'state_change', data: state });

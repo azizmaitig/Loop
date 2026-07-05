@@ -45,15 +45,16 @@ export class Daemon {
 
     // Register triggers from CLI options
     if (opts?.cron) {
+      const cronExpr = opts.cron;
       try {
-        const trigger = new CronTrigger(opts.cron, () => {
-          this.taskQueue.enqueue(opts.cron, { timeoutMs: 60000 });
+        const trigger = new CronTrigger(cronExpr, () => {
+          this.taskQueue.enqueue(cronExpr, { timeoutMs: 60000 });
           // ponytail: triggers enqueue tasks, processQueue picks them up
           this.maybeProcessQueue();
         });
         this.triggerManager.register('cron-cli', trigger);
       } catch (err) {
-        console.error(`[daemon] Invalid cron expression "${opts.cron}":`, err instanceof Error ? err.message : String(err));
+        console.error(`[daemon] Invalid cron expression "${cronExpr}":`, err instanceof Error ? err.message : String(err));
       }
     }
 
@@ -132,16 +133,25 @@ export class Daemon {
 
         // POST /stop
         if (url.pathname === '/stop' && req.method === 'POST') {
+          if (!this.isAuthorized(req)) {
+            return Response.json({ error: 'unauthorized' }, { status: 401 });
+          }
           setTimeout(() => this.stop(), 50);
           return Response.json({ status: 'ok' });
         }
 
         // POST /task — enqueue a new task
         if (url.pathname === '/task' && req.method === 'POST') {
+          if (!this.isAuthorized(req)) {
+            return Response.json({ error: 'unauthorized' }, { status: 401 });
+          }
           try {
             const body = await req.json();
             if (!body || typeof body.command !== 'string' || body.command.trim().length === 0) {
               return Response.json({ error: 'command is required' }, { status: 400 });
+            }
+            if (!this.isSafeCommand(body.command)) {
+              return Response.json({ error: 'command rejected: unsafe shell metacharacters' }, { status: 400 });
             }
 const task = this.taskQueue.enqueue(body.command, {
   timeoutMs: typeof body.timeoutMs === 'number' ? body.timeoutMs : undefined,
@@ -177,6 +187,9 @@ return Response.json({ id: task.id, status: task.status }, { status: 201 });
         // POST /loops/:id/start — start a child loop
         const loopsStartMatch = url.pathname.match(/^\/loops\/([^/]+)\/start$/);
         if (loopsStartMatch && req.method === 'POST') {
+          if (!this.isAuthorized(req)) {
+            return Response.json({ error: 'unauthorized' }, { status: 401 });
+          }
           const started = await this.orchestrator.startChild(loopsStartMatch[1]);
           if (started === 'not_found') {
             return Response.json({ error: 'child loop not found' }, { status: 404 });
@@ -190,6 +203,9 @@ return Response.json({ id: task.id, status: task.status }, { status: 201 });
         // POST /loops/:id/stop — stop a child loop
         const loopsStopMatch = url.pathname.match(/^\/loops\/([^/]+)\/stop$/);
         if (loopsStopMatch && req.method === 'POST') {
+          if (!this.isAuthorized(req)) {
+            return Response.json({ error: 'unauthorized' }, { status: 401 });
+          }
           const stopped = await this.orchestrator.stopChild(loopsStopMatch[1]);
           if (stopped === 'not_found') {
             return Response.json({ error: 'child loop not found' }, { status: 404 });
@@ -207,6 +223,9 @@ return Response.json({ id: task.id, status: task.status }, { status: 201 });
 
         // POST /loops — create a new child loop
         if (url.pathname === '/loops' && req.method === 'POST') {
+          if (!this.isAuthorized(req)) {
+            return Response.json({ error: 'unauthorized' }, { status: 401 });
+          }
           try {
             const body = await req.json();
             if (!body || typeof body.name !== 'string' || typeof body.planPath !== 'string') {
@@ -222,6 +241,9 @@ return Response.json({ id: task.id, status: task.status }, { status: 201 });
         // DELETE /loops/:id — remove a child loop
         const loopsDeleteMatch = url.pathname.match(/^\/loops\/([^/]+)$/);
         if (loopsDeleteMatch && req.method === 'DELETE') {
+          if (!this.isAuthorized(req)) {
+            return Response.json({ error: 'unauthorized' }, { status: 401 });
+          }
           const removed = this.orchestrator.removeChild(loopsDeleteMatch[1]);
           if (!removed) {
             return Response.json({ error: 'child loop not found' }, { status: 404 });
@@ -261,8 +283,8 @@ return Response.json({ id: task.id, status: task.status }, { status: 201 });
       },
     });
 
-    this._port = this.server.port;
-    this._status.port = this.server.port;
+    this._port = this.server!.port!;
+    this._status.port = this.server!.port!;
 
     console.error(`Daemon v${this._status.version} listening on port ${this.server.port}`);
 
@@ -318,7 +340,24 @@ return Response.json({ id: task.id, status: task.status }, { status: 201 });
     }
   }
 
+  private isAuthorized(req: Request): boolean {
+    const apiKey = process.env.LOOP_API_KEY;
+    if (!apiKey) return true; // No key configured = open access
+    const auth = req.headers.get('Authorization');
+    return auth === `Bearer ${apiKey}`;
+  }
+
+  private isSafeCommand(cmd: string): boolean {
+    return !/[;&|`$\n\r]/.test(cmd);
+  }
+
   private async executeTask(task: Task): Promise<void> {
+    if (!this.isSafeCommand(task.command)) {
+      this.taskQueue.fail(task.id, 'Command rejected: unsafe shell metacharacters detected');
+      this.broadcast('task_completed', this.taskQueue.get(task.id));
+      return;
+    }
+
     const timeoutMs = task.timeoutMs ?? 60000;
     const startTime = Date.now();
 
