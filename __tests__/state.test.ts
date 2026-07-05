@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -7,8 +7,9 @@ import {
   writeState,
   createInitialState,
   updatePhaseResult,
+  updateStateMd,
 } from "../src/state.js";
-import type { LoopConfig, PhaseResult } from "../src/types.js";
+import type { LoopConfig, PhaseResult, StateMdFrontmatter } from "../src/state.js";
 
 async function tempDir(): Promise<string> {
   return await mkdtemp(join(tmpdir(), "agent-loop-state-"));
@@ -262,5 +263,94 @@ describe("updatePhaseResult", () => {
     expect(s2.phaseResults["build"].status).toBe("error");
     expect(s2.phaseResults["build"].durationMs).toBe(20);
     expect(Object.keys(s2.phaseResults).length).toBe(1);
+  });
+});
+
+describe("updateStateMd", () => {
+  const fm: StateMdFrontmatter = {
+    last_run: "2026-07-05T12:00:00.000Z",
+    current_state: "running",
+    iteration: 5,
+    active_children: 2,
+    high_priority: 1,
+    watch_items: 3,
+    task_count: 42,
+  };
+
+  test("creates STATE.md with frontmatter when file doesn't exist", async () => {
+    const dir = await tempDir();
+    const p = join(dir, "STATE.md");
+    await updateStateMd(p, fm);
+
+    const content = await readFile(p, "utf-8");
+    expect(content).toContain("last_run: \"2026-07-05T12:00:00.000Z\"");
+    expect(content).toContain("current_state: running");
+    expect(content).toContain("iteration: 5");
+    expect(content).toContain("active_children: 2");
+    expect(content).toContain("task_count: 42");
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("preserves body text after frontmatter", async () => {
+    const dir = await tempDir();
+    const p = join(dir, "STATE.md");
+
+    // Write initial content with body
+    await Bun.write(p, `---
+last_run: never
+current_state: idle
+iteration: 0
+active_children: 0
+high_priority: 0
+watch_items: 0
+task_count: 0
+---
+
+# My Project
+
+## Notes
+Human written content here.
+`);
+
+    // Update frontmatter
+    await updateStateMd(p, fm);
+
+    const content = await readFile(p, "utf-8");
+    // New frontmatter values
+    expect(content).toContain("last_run: \"2026-07-05T12:00:00.000Z\"");
+    expect(content).toContain("iteration: 5");
+    // Body preserved
+    expect(content).toContain("# My Project");
+    expect(content).toContain("Human written content here.");
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("preserves body when file has no frontmatter (treats whole content as body)", async () => {
+    const dir = await tempDir();
+    const p = join(dir, "STATE.md");
+
+    await Bun.write(p, "# Bare State\n\nNo frontmatter at all.");
+
+    await updateStateMd(p, fm);
+
+    const content = await readFile(p, "utf-8");
+    expect(content).toContain("last_run:");
+    expect(content).toContain("# Bare State");
+    expect(content).toContain("No frontmatter at all.");
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("does not throw when called on non-existent path", async () => {
+    const dir = await tempDir();
+    const p = join(dir, "STATE.md");
+
+    await expect(updateStateMd(p, fm)).resolves.toBeUndefined();
+    const content = await readFile(p, "utf-8");
+    expect(content.length).toBeGreaterThan(0);
+
+    await rm(dir, { recursive: true, force: true });
   });
 });

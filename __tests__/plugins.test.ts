@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { loadPlugins, executeHooks } from "../src/plugins.js";
-import type { LoopConfig, PhaseDef, PhaseResult, Plugin } from "../src/types.js";
+import { loadPlugins, executeHooks, executeBeforeLoop, executeAfterLoop } from "../src/plugins.js";
+import type { LoopConfig, PhaseDef, PhaseResult, Plugin, LoopResult } from "../src/types.js";
 import type { HookContext } from "../src/plugins.js";
 
 const MINIMAL_CONFIG: LoopConfig = {
@@ -148,5 +148,123 @@ describe("executeHooks", () => {
     const ctx = makeHookContext();
     await executeHooks("onPhaseStart", ctx, [pluginA, pluginB]);
     expect(order).toEqual(["A", "B"]);
+  });
+});
+
+describe("executeBeforeLoop", () => {
+  test("returns PhaseDef[] from beforeLoop hook", async () => {
+    const phases = [makePhase({ name: "scan" }), makePhase({ name: "report" })];
+    const plugin: Plugin = {
+      name: "planner",
+      beforeLoop: async (planPath: string) => {
+        return phases;
+      },
+    };
+    const result = await executeBeforeLoop(plugin, "/tmp/plan.md");
+    expect(result).toEqual(phases);
+  });
+
+  test("returns empty array when no beforeLoop hook", async () => {
+    const plugin: Plugin = { name: "noop" };
+    const result = await executeBeforeLoop(plugin, "/tmp/plan.md");
+    expect(result).toEqual([]);
+  });
+
+  test("catches beforeLoop errors and returns empty array", async () => {
+    const plugin: Plugin = {
+      name: "crashy",
+      beforeLoop: async () => { throw new Error("boom"); },
+    };
+    const result = await executeBeforeLoop(plugin, "/tmp/plan.md");
+    expect(result).toEqual([]);
+  });
+
+  test("beforeLoop receives planPath argument", async () => {
+    let capturedPath = "";
+    const plugin: Plugin = {
+      name: "path-check",
+      beforeLoop: async (planPath: string) => {
+        capturedPath = planPath;
+        return [];
+      },
+    };
+    await executeBeforeLoop(plugin, "/custom/path.md");
+    expect(capturedPath).toBe("/custom/path.md");
+  });
+});
+
+describe("executeAfterLoop", () => {
+  test("calls afterLoop with LoopResult", async () => {
+    let captured: LoopResult | null = null;
+    const plugin: Plugin = {
+      name: "reporter",
+      afterLoop: async (result: LoopResult) => {
+        captured = result;
+      },
+    };
+    const loopResult: LoopResult = {
+      finalState: "done",
+      iterationsCompleted: 3,
+      allPhasesPassed: true,
+      totalDurationMs: 5000,
+    };
+    await executeAfterLoop(plugin, loopResult);
+    expect(captured).toEqual(loopResult);
+  });
+
+  test("does nothing when no afterLoop hook", async () => {
+    const plugin: Plugin = { name: "noop" };
+    const loopResult: LoopResult = {
+      finalState: "done",
+      iterationsCompleted: 0,
+      allPhasesPassed: false,
+      totalDurationMs: 0,
+    };
+    await expect(executeAfterLoop(plugin, loopResult)).resolves.toBeUndefined();
+  });
+
+  test("catches afterLoop errors without throwing", async () => {
+    const plugin: Plugin = {
+      name: "crashy",
+      afterLoop: async () => { throw new Error("boom"); },
+    };
+    const loopResult: LoopResult = {
+      finalState: "done",
+      iterationsCompleted: 0,
+      allPhasesPassed: false,
+      totalDurationMs: 0,
+    };
+    await expect(executeAfterLoop(plugin, loopResult)).resolves.toBeUndefined();
+  });
+});
+
+describe("pluginFromModule extract beforeLoop/afterLoop", () => {
+  test("executeBeforeLoop works on plugin loaded via pluginFromModule", async () => {
+    const plugin: Plugin = {
+      name: "from-module",
+      beforeLoop: async (planPath: string) => {
+        return [makePhase({ name: "injected-phase" })];
+      },
+    };
+    const result = await executeBeforeLoop(plugin, "plan.md");
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("injected-phase");
+  });
+
+  test("executeAfterLoop works on plugin loaded via pluginFromModule", async () => {
+    let captured: boolean | null = null;
+    const plugin: Plugin = {
+      name: "from-module",
+      afterLoop: async (result: LoopResult) => {
+        captured = result.allPhasesPassed;
+      },
+    };
+    await executeAfterLoop(plugin, {
+      finalState: "done",
+      iterationsCompleted: 1,
+      allPhasesPassed: true,
+      totalDurationMs: 100,
+    });
+    expect(captured).toBe(true);
   });
 });

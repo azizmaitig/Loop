@@ -15,12 +15,14 @@ import { createInterface } from 'node:readline';
 import { StateMachine } from './src/state-machine.js';
 import { writeState, createInitialState, updatePhaseResult } from './src/state.js';
 import { executeWithTimeout } from './src/safety.js';
-import type { LoopConfig, PhaseDef, PhaseResult, LoopState, Judgment } from './src/types.js';
+import type { LoopConfig, PhaseDef, PhaseResult, LoopState, LoopResult, Judgment } from './src/types.js';
 import { evaluatePhase } from './src/evaluate.js';
-import { loadPlugins, executeHooks } from './src/plugins.js';
+import { loadPlugins, executeHooks, executeBeforeLoop, executeAfterLoop } from './src/plugins.js';
 import type { Plugin, HookContext } from './src/plugins.js';
 import { startApiServer } from './src/api.js';
 import type { ApiServer, ApiHandlers } from './src/api.js';
+import { Daemon } from './src/daemon.js';
+import { initProject } from './src/init.js';
 import { onPhaseFailed, onLoopComplete, logPhaseContext } from './src/memory-hooks.js';
 
 // ── Built-in tasks ──────────────────────────────────────────────────────────
@@ -48,7 +50,12 @@ const OUTPUT_DIR = resolve('_agent-loop-output');
 
 function printHelp(): void {
   console.log(`
-Usage: bun run loop.ts start [options]
+Usage: bun run loop.ts <command> [options]
+
+Commands:
+  start                        Run loop (phases/task)
+  daemon                       Run as persistent daemon (no task execution yet)
+  init                         Scaffold STATE.md, LOOP.md, AGENTS.md
 
 Options:
   --phases <name1,name2,...>   Run named phases from the built-in task
@@ -58,8 +65,14 @@ Options:
   --daemon                     Run as daemon on interval (no max-iterations cap)
   --llm <server,tool>          Enable LLM controller (sets llmController, configures MCP server/tool)
   --plugins <path1,path2,...>  Load plugin modules from these paths
-  --port <number>              HTTP/WS API port (default: 3099)
+  --plan <path>                Path to a .plan.yaml file
+  --port <number>              HTTP API port (daemon default: 3000, start default: 3099)
+  --cron <expression>          Cron schedule for recurring tasks (e.g. "0 9 * * *")
+  --watch-dir <path>           Watch directory for .plan.yaml files
+  --loops-config <path>        Path to loops.yaml for multi-loop orchestration
   --memory                     Enable agentmemory integration (episodic save, health pulse, lesson extraction)
+  --dir <path>                 Target directory for init (default: cwd)
+  --force                      Overwrite existing files in init
   --help                       Print this help and exit
 `);
 }
@@ -69,6 +82,8 @@ Options:
 interface ParsedArgs {
   subcommand: string;
   help: boolean;
+  initDir: string | undefined;
+  initForce: boolean;
   daemon: boolean;
   phaseNames: string[] | undefined;
   taskName: string | undefined;
@@ -76,11 +91,15 @@ interface ParsedArgs {
   timeout: number | undefined;
   llmConfig: string | undefined;
   pluginPaths: string | undefined;
+  planPath: string | undefined;
   port: number | undefined;
+  cron: string | undefined;
+  watchDir: string | undefined;
+  loopsConfig: string | undefined;
   memory: boolean;
 }
 
-function parseArgs(rawArgs: string[]): ParsedArgs {
+export function parseArgs(rawArgs: string[]): ParsedArgs {
   let help = false;
   let subcommand = '';
   let daemon = false;
@@ -90,8 +109,14 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
   let timeout: number | undefined;
   let llmConfig: string | undefined;
   let pluginPaths: string | undefined;
+  let planPath: string | undefined;
   let port: number | undefined;
+  let cron: string | undefined;
+  let watchDir: string | undefined;
+  let loopsConfig: string | undefined;
   let memory = false;
+  let initDir: string | undefined;
+  let initForce = false;
 
   for (let i = 0; i < rawArgs.length; i++) {
     const arg = rawArgs[i];
@@ -103,6 +128,12 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
         break;
       case 'start':
         subcommand = 'start';
+        break;
+      case 'init':
+        subcommand = 'init';
+        break;
+      case 'daemon':
+        subcommand = 'daemon';
         break;
       case '--phases': {
         const val = rawArgs[++i];
@@ -123,6 +154,13 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
         if (!isNaN(val)) timeout = val;
         break;
       }
+      case '--dir': {
+        initDir = rawArgs[++i];
+        break;
+      }
+      case '--force':
+        initForce = true;
+        break;
       case '--daemon':
         daemon = true;
         break;
@@ -134,9 +172,25 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
         pluginPaths = rawArgs[++i];
         break;
       }
+      case '--plan': {
+        planPath = rawArgs[++i];
+        break;
+      }
       case '--port': {
         const val = parseInt(rawArgs[++i], 10);
         if (!isNaN(val)) port = val;
+        break;
+      }
+      case '--cron': {
+        cron = rawArgs[++i];
+        break;
+      }
+      case '--watch-dir': {
+        watchDir = rawArgs[++i];
+        break;
+      }
+      case '--loops-config': {
+        loopsConfig = rawArgs[++i];
         break;
       }
       case '--memory':
@@ -145,7 +199,7 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
     }
   }
 
-  return { subcommand, help, daemon, phaseNames, taskName, maxIterations, timeout, llmConfig, pluginPaths, port, memory };
+  return { subcommand, help, initDir, initForce, daemon, phaseNames, taskName, maxIterations, timeout, llmConfig, pluginPaths, planPath, port, cron, watchDir, loopsConfig, memory };
 }
 
 // ── Phase resolution ────────────────────────────────────────────────────────
@@ -335,6 +389,19 @@ async function runLoop(config: LoopConfig): Promise<number> {
   // Load plugins once (v2: no plugins → v1 behavior)
   const plugins = await loadPlugins(config);
 
+  // Plan-driven mode: use plan-executor's beforeLoop to load phases from .plan.yaml
+  let planPlugin: Plugin | undefined;
+  if (config.planPath) {
+    planPlugin = plugins.find(p => p.name === 'plan-executor');
+    if (planPlugin?.beforeLoop) {
+      const planPhases = await executeBeforeLoop(planPlugin, config.planPath);
+      if (planPhases.length > 0) {
+        config = { ...config, phases: planPhases };
+        console.log(`[plan-executor] Loaded ${planPhases.length} phases from ${config.planPath}`);
+      }
+    }
+  }
+
   // Write initial state
   await writeBothStates(state);
 
@@ -439,6 +506,18 @@ async function runLoop(config: LoopConfig): Promise<number> {
   await writeBothStates(state);
 
   await onLoopComplete(state, config).catch(() => {});
+
+  // Plan-driven mode: call afterLoop to write status back to the plan yaml
+  if (planPlugin?.afterLoop) {
+    const loopResult: LoopResult = {
+      finalState: state.currentState,
+      iterationsCompleted: state.iteration,
+      allPhasesPassed: allPassed,
+      totalDurationMs: Date.now() - new Date(state.startTime).getTime(),
+      phaseResults: state.phaseResults,
+    };
+    await executeAfterLoop(planPlugin, loopResult);
+  }
 
   return allPassed ? 0 : 1;
 }
@@ -614,9 +693,39 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const parsed = parseArgs(args);
 
-  if (parsed.help || parsed.subcommand !== 'start') {
+  if (parsed.help) {
     printHelp();
-    process.exit(parsed.help ? 0 : 1);
+    process.exit(0);
+  }
+
+  // ── Init mode — scaffold convention files ───────────────────────────────
+  if (parsed.subcommand === 'init') {
+    const initDir = parsed.initDir ?? resolve('.');
+    const result = await initProject(initDir, { force: parsed.initForce });
+    for (const name of result.created) {
+      console.log(`Created ${name}`);
+    }
+    for (const warn of result.warnings) {
+      console.warn(`Warning: ${warn}`);
+    }
+    process.exit(result.created.length > 0 ? 0 : 1);
+  }
+
+  // ── Daemon mode (v6) ────────────────────────────────────────────────────
+  if (parsed.subcommand === 'daemon') {
+    const port = parsed.port ?? 3000;
+    const daemon = new Daemon(port, undefined, {
+      cron: parsed.cron,
+      watchDir: parsed.watchDir,
+      loopsConfig: parsed.loopsConfig,
+    });
+    await daemon.start();
+    return;
+  }
+
+  if (parsed.subcommand !== 'start') {
+    printHelp();
+    process.exit(1);
   }
 
   // Resolve phase config from built-in tasks
@@ -641,6 +750,10 @@ async function main(): Promise<void> {
   }
   if (parsed.pluginPaths) {
     config.plugins = parsed.pluginPaths.split(',').map(s => s.trim());
+  }
+  if (parsed.planPath) {
+    config.plugins = [...(config.plugins ?? []), './src/plan-executor.ts'];
+    config.planPath = parsed.planPath;
   }
   if (parsed.port !== undefined) {
     config.daemon = { ...config.daemon ?? { intervalMs: 60000 }, port: parsed.port };
@@ -671,4 +784,6 @@ async function main(): Promise<void> {
   process.exit(exitCode);
 }
 
-await main();
+if (import.meta.main) {
+  await main();
+}

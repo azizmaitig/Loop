@@ -1,4 +1,5 @@
-import type { LoopState, LoopConfig, PhaseResult } from './types.js';
+import type { LoopState, LoopConfig, PhaseResult, DaemonStatus } from './types.js';
+import { existsSync, readFileSync } from 'node:fs';
 
 const STATE_VERSION = 1;
 
@@ -144,4 +145,55 @@ export function updatePhaseResult(
       [phaseName]: result,
     },
   };
+}
+
+/**
+ * Frontmatter fields for the human-facing STATE.md.
+ */
+export interface StateMdFrontmatter {
+  last_run: string;
+  active_children: number;
+  high_priority: number;
+  watch_items: number;
+  task_count: number;
+  current_state: string;
+  iteration: number;
+}
+
+/**
+ * Update the project-level STATE.md with new frontmatter.
+ * Preserves any human-written body text after the frontmatter.
+ * Creates the file if it doesn't exist.
+ *
+ * @param path - Full path to STATE.md
+ * @param fm   - Frontmatter data to write
+ */
+export async function updateStateMd(
+  path: string,
+  fm: StateMdFrontmatter,
+): Promise<void> {
+  let body = '';
+  if (existsSync(path)) {
+    const content = readFileSync(path, 'utf-8');
+    const match = content.match(/^---[\s\S]*?---\n?(.*)$/s);
+    body = match ? match[1] : content;
+  }
+
+  const frontmatter = [
+    '---',
+    `last_run: "${fm.last_run}"`,
+    `current_state: ${fm.current_state}`,
+    `iteration: ${fm.iteration}`,
+    `active_children: ${fm.active_children}`,
+    `high_priority: ${fm.high_priority}`,
+    `watch_items: ${fm.watch_items}`,
+    `task_count: ${fm.task_count}`,
+    '---',
+  ].join('\n');
+
+  const output = body.trim()
+    ? `${frontmatter}\n\n${body}`
+    : frontmatter + '\n';
+
+  await Bun.write(path, output);
 }

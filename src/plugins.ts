@@ -1,12 +1,14 @@
 import { readdirSync } from 'node:fs';
 import { join, resolve, isAbsolute } from 'node:path';
-import type { PhaseDef, PhaseResult, LoopState, LoopConfig } from './types.js';
+import type { PhaseDef, PhaseResult, LoopState, LoopResult, LoopConfig } from './types.js';
 
 export interface Plugin {
   name: string;
   onPhaseStart?: (phase: PhaseDef, state: LoopState) => Promise<void> | void;
   onPhaseEnd?: (phase: PhaseDef, result: PhaseResult, state: LoopState) => Promise<void> | void;
   onError?: (error: Error, phase: PhaseDef) => Promise<void> | void;
+  beforeLoop?: (planPath: string) => PhaseDef[] | Promise<PhaseDef[]>;
+  afterLoop?: (result: LoopResult) => void | Promise<void>;
 }
 
 export interface HookContext {
@@ -103,7 +105,36 @@ function pluginFromModule(mod: Record<string, unknown>, name: string): Plugin {
   if (typeof mod.onPhaseStart === 'function') plugin.onPhaseStart = mod.onPhaseStart as Plugin['onPhaseStart'];
   if (typeof mod.onPhaseEnd === 'function') plugin.onPhaseEnd = mod.onPhaseEnd as Plugin['onPhaseEnd'];
   if (typeof mod.onError === 'function') plugin.onError = mod.onError as Plugin['onError'];
+  if (typeof mod.beforeLoop === 'function') plugin.beforeLoop = mod.beforeLoop as Plugin['beforeLoop'];
+  if (typeof mod.afterLoop === 'function') plugin.afterLoop = mod.afterLoop as Plugin['afterLoop'];
   return plugin;
+}
+
+/**
+ * Execute a plugin's beforeLoop hook.
+ * Returns PhaseDef[] from the hook, or empty [] if no hook or on error.
+ */
+export async function executeBeforeLoop(plugin: Plugin, planPath: string): Promise<PhaseDef[]> {
+  if (!plugin.beforeLoop) return [];
+  try {
+    return await plugin.beforeLoop(planPath);
+  } catch (e) {
+    console.error(`[plugins] ${plugin.name}.beforeLoop failed:`, e);
+    return [];
+  }
+}
+
+/**
+ * Execute a plugin's afterLoop hook.
+ * Silently no-ops if no hook defined; catches errors.
+ */
+export async function executeAfterLoop(plugin: Plugin, result: LoopResult): Promise<void> {
+  if (!plugin.afterLoop) return;
+  try {
+    await plugin.afterLoop(result);
+  } catch (e) {
+    console.error(`[plugins] ${plugin.name}.afterLoop failed:`, e);
+  }
 }
 
 async function safeImport(specifier: string): Promise<Record<string, unknown> | null> {

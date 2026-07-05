@@ -4,6 +4,8 @@ import type { ServerWebSocket } from 'bun';
 import type { DaemonStatus, Task } from './types.js';
 import { TaskQueue } from './task-queue.js';
 import { saveTaskHistory, readTaskHistory, listTaskHistory } from './history.js';
+import { updateStateMd } from './state.js';
+import type { StateMdFrontmatter } from './state.js';
 import { CronTrigger, FileWatchTrigger, TriggerManager } from './triggers.js';
 import { LoopOrchestrator } from './orchestrator.js';
 
@@ -361,6 +363,20 @@ return Response.json({ id: task.id, status: task.status }, { status: 201 });
       const completedTask = this.taskQueue.get(task.id);
       if (completedTask) {
         saveTaskHistory(this.baseDir, completedTask).catch(() => {});
+
+        // Auto-update STATE.md frontmatter after each task
+        const stateMdPath = resolve(this.baseDir, 'STATE.md');
+        const taskCount = this.taskQueue.history.length;
+        const fm: StateMdFrontmatter = {
+          last_run: new Date().toISOString(),
+          current_state: this._status.status,
+          iteration: taskCount,
+          active_children: this.orchestrator.listChildren().filter(c => c.status === 'running').length,
+          high_priority: 0,
+          watch_items: 0,
+          task_count: taskCount,
+        };
+        updateStateMd(stateMdPath, fm).catch(() => {});
       }
     }
 
