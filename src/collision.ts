@@ -1,5 +1,6 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { parseFrontmatter, dumpFrontmatter } from './yaml.js';
 
 /**
  * Static priority ranking. Higher number = higher priority.
@@ -44,108 +45,6 @@ function patternFromFilename(filename: string): string {
         : w.charAt(0).toUpperCase() + w.slice(1),
     )
     .join(' ');
-}
-
-/**
- * Parse YAML frontmatter from a markdown file content.
- * Returns `null` when the content has no `---\n...\n---` block.
- */
-function parseFrontmatter(content: string): Record<string, unknown> | null {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return null;
-
-  const parsed: Record<string, unknown> = {};
-  for (const line of match[1].split('\n')) {
-    const colonIdx = line.indexOf(':');
-    if (colonIdx === -1) continue;
-    const key = line.slice(0, colonIdx).trim();
-    const raw = line.slice(colonIdx + 1).trim();
-    if (!key) continue;
-
-    // JSON objects / arrays
-    if (raw.startsWith('{') || raw.startsWith('[')) {
-      try {
-        parsed[key] = JSON.parse(raw);
-      } catch {
-        parsed[key] = raw;
-      }
-      continue;
-    }
-
-    // Quoted strings
-    if (
-      (raw.startsWith('"') && raw.endsWith('"')) ||
-      (raw.startsWith("'") && raw.endsWith("'"))
-    ) {
-      parsed[key] = raw.slice(1, -1);
-      continue;
-    }
-
-    // YAML null / tilde
-    if (raw === '~' || raw === 'null') {
-      parsed[key] = null;
-      continue;
-    }
-
-    // Numbers
-    if (/^-?\d+(\.\d+)?$/.test(raw)) {
-      parsed[key] = Number(raw);
-      continue;
-    }
-
-    // Booleans
-    if (raw === 'true') {
-      parsed[key] = true;
-      continue;
-    }
-    if (raw === 'false') {
-      parsed[key] = false;
-      continue;
-    }
-
-    // Plain string fallback
-    parsed[key] = raw;
-  }
-
-  return parsed;
-}
-
-/**
- * Decide whether a bare YAML value needs quoting.
- * Quotes are required when the string matches a YAML keyword / number,
- * or contains characters that would break parsing.
- */
-function needsYamlQuoting(val: string): boolean {
-  if (val === 'true' || val === 'false' || val === 'null' || val === '~') return true;
-  if (/^-?\d+(\.\d+)?$/.test(val)) return true;
-  // Spaces, colons, hash, other special chars
-  if (/[\s:#{}\[\]&*!|>]/.test(val)) return true;
-  return val === '';
-}
-
-/**
- * Serialize a set of key/value pairs back into YAML frontmatter.
- * Null values are omitted; simple identifier strings are written bare;
- * complex strings and objects are quoted / JSON.
- */
-function serializeFrontmatter(data: Record<string, unknown>): string {
-  const lines: string[] = ['---'];
-  for (const [key, val] of Object.entries(data)) {
-    if (val === null || val === undefined) continue;
-    if (typeof val === 'string') {
-      if (needsYamlQuoting(val)) {
-        lines.push(`${key}: "${val}"`);
-      } else {
-        lines.push(`${key}: ${val}`);
-      }
-    } else if (typeof val === 'number' || typeof val === 'boolean') {
-      lines.push(`${key}: ${val}`);
-    } else {
-      lines.push(`${key}: ${JSON.stringify(val)}`);
-    }
-  }
-  lines.push('---');
-  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +150,6 @@ export async function claimTarget(
     parsed.acting_on = target;
   }
 
-  const frontmatter = serializeFrontmatter(parsed);
+  const frontmatter = dumpFrontmatter(parsed);
   await writeFile(fullPath, frontmatter + body, 'utf-8');
 }
