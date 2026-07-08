@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "active_work_id": "agent-loop-file-watch",
+  "works": {
+    "agent-loop-file-watch": {
+      "work_id": "agent-loop-file-watch",
+      "active_plan": ".omo/plans/agent-loop-file-watch.md",
+      "plan_name": "agent-loop-file-watch",
+      "session_ids": ["codex:current"],
+      "status": "active",
+      "worktree_path": null
+    }
+  }
+}

@@ -1,0 +1,27 @@
+node_modules/
+dist/
+_agent-loop-output/
+_daemon_*.txt
+_test-state.md
+
+incoming/
+*.log
+daemon.err
+nul
+.env
+opencode-prompt-*.tmp
+_test-*.ts
+_test-*.md
+_loop-history/
+_loops.yaml
+llm-test.json
+triage-task*.json
+test_*.yaml
+test_*.json
+
+# Build artifacts, caches, and project noise
+GARBAGE/
+.omo/evidence/
+.omo/run-continuation/
+.omo/notepads/
+_agent-loop-output/
