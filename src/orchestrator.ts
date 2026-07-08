@@ -4,17 +4,12 @@ import type { ChildLoopDef, ChildLoopState, ChildLoopSummary, LoopsConfig, Start
 import { CronTrigger, FileWatchTrigger, TriggerManager } from './triggers.js';
 import { TaskQueue } from './task-queue.js';
 import { parseYaml } from './yaml.js';
+import { isSafePath } from './shell.js';
 
 let childIdCounter = 0;
 function generateChildId(): string {
   childIdCounter++;
   return `child-${Date.now().toString(36)}-${childIdCounter}`;
-}
-
-const PATH_UNSAFE_CHARS = /[;&|`$()\n\r]/;
-
-function isSafePath(path: string): boolean {
-  return !PATH_UNSAFE_CHARS.test(path);
 }
 
 export class LoopOrchestrator {

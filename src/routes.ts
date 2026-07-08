@@ -12,7 +12,7 @@ import { callLLM } from './llm.js';
 import { readTaskHistory, listTaskHistory } from './history.js';
 import { updateStateMd } from './state.js';
 import type { StateMdFrontmatter } from './state.js';
-import { isSafeCommand } from './task-processor.js';
+import { isSafeCommand } from './shell.js';
 
 /**
  * Register all HTTP/WS routes on a Bun.serve server config.

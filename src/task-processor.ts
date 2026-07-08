@@ -15,6 +15,7 @@ import { saveTaskHistory } from './history.js';
 import { updateStateMd } from './state.js';
 import type { StateMdFrontmatter } from './state.js';
 import { checkBudget } from './budget.js';
+import { isSafeCommand, runCommand } from './shell.js';
 
 /**
  * Dependencies injected into every task-processing operation.
@@ -26,14 +27,6 @@ export interface TaskContext {
   getState: () => { status: string };
   isPaused: () => Promise<boolean>;
   broadcast: (type: string, data: unknown) => void;
-}
-
-/**
- * Check whether a shell command string contains unsafe metacharacters.
- * Same guard used by daemon.ts — extracted here for the processor.
- */
-export function isSafeCommand(cmd: string): boolean {
-  return !/[;&|`$\n\r]/.test(cmd);
 }
 
 /**
@@ -74,33 +67,45 @@ export async function executeTask(task: Task, ctx: TaskContext): Promise<void> {
     return;
   }
 
-  // ponytail: opencode commands spawned directly (not via cmd.exe) for proper stdio capture
+  // Special spawn paths: opencode (direct binary, no shell) and .ps1 (powershell)
   const isOpencode = task.command.startsWith('opencode');
+  const parts = task.command.split(/\s+/).filter(Boolean);
+  const isPs1 = parts.length > 0 && parts[0].toLowerCase().endsWith('.ps1');
   const timeoutMs = isOpencode ? (task.timeoutMs ?? 300000) : (task.timeoutMs ?? 60000);
-  const startTime = Date.now();
 
   try {
-    const proc = isOpencode
-      ? Bun.spawn(task.command.split(/\s+/).filter(Boolean), {
-          stdio: ['ignore', 'pipe', 'pipe'],
-        })
-      : Bun.spawn(['cmd.exe', '/c', task.command], {
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
+    let exitCode: number;
+    let stdout: string;
+    let stderr: string;
+    let durationMs: number;
 
-    const [stdout, stderr] = await Promise.all([
-      Bun.readableStreamToText(proc.stdout),
-      Bun.readableStreamToText(proc.stderr),
-    ]);
+    if (isOpencode) {
+      const startTime = Date.now();
+      const proc = Bun.spawn(parts, { stdio: ['ignore', 'pipe', 'pipe'] });
+      [stdout, stderr] = await Promise.all([
+        Bun.readableStreamToText(proc.stdout),
+        Bun.readableStreamToText(proc.stderr),
+      ]);
+      exitCode = await proc.exited;
+      durationMs = Date.now() - startTime;
+    } else if (isPs1) {
+      const startTime = Date.now();
+      const proc = Bun.spawn(['powershell.exe', '-NoProfile', '-File', ...parts], { stdio: ['ignore', 'pipe', 'pipe'] });
+      [stdout, stderr] = await Promise.all([
+        Bun.readableStreamToText(proc.stdout),
+        Bun.readableStreamToText(proc.stderr),
+      ]);
+      exitCode = await proc.exited;
+      durationMs = Date.now() - startTime;
+    } else {
+      const result = await runCommand(task.command, { timeoutMs });
+      exitCode = result.exitCode;
+      stdout = result.stdout;
+      stderr = result.stderr;
+      durationMs = result.durationMs;
+    }
 
-    const exitCode = await proc.exited;
-
-    taskQueue.complete(task.id, {
-      exitCode,
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
-      durationMs: Date.now() - startTime,
-    });
+    taskQueue.complete(task.id, { exitCode, stdout, stderr, durationMs });
     broadcast('task_completed', taskQueue.get(task.id));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

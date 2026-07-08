@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { processQueue, executeTask, isSafeCommand } from "../src/task-processor.js";
+import { processQueue, executeTask } from "../src/task-processor.js";
+import { isSafeCommand } from "../src/shell.js";
 import type { TaskContext } from "../src/task-processor.js";
 import { TaskQueue } from "../src/task-queue.js";
 import type { Task } from "../src/types.js";
