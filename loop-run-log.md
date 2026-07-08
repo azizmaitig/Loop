@@ -1,83 +1,75 @@
-# Loop Run Log — YOUR_PROJECT
+# Loop Run Log � YOUR_PROJECT
 
 Append one entry per run. Prune entries older than 30 days.
 
-## Format
-
-```json
-{
-  "run_id": "2026-06-09T08:15:00Z",
-  "pattern": "daily-triage",
-  "duration_s": 45,
-  "items_found": 4,
-  "actions_taken": 1,
-  "escalations": 0,
-  "tokens_estimate": 52000,
-  "outcome": "report-only | fix-proposed | escalated | no-op"
-}
-```
-
-## Recent Runs
-
-<!-- Loop appends below this line -->daily-triage completed 
-\"received: 07/06/2026 23:56:20\" 
-\"received: $(date)\" 
-{\"run_id\": \"07/07/2026  3:32:09,47\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:09,47\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:09,71\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:09,71\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:09,96\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:09,96\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:10,19\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:10,19\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:10,45\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:10,45\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:10,69\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:10,69\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:10,93\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:10,93\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:11,22\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:11,22\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:11,47\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:11,47\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:32:11,73\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:32:11,73\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:42:33,71\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:42:33,71\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:43:32,12\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:43:32,12\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:44:09,22\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:44:09,22\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:56:01,42\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:56:01,42\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  3:57:11,15\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  3:57:11,15\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:02:12,71\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:02:12,71\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:02:47,87\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:02:47,87\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:03:58,12\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:03:58,12\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:07:07,71\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:07:07,71\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:08:19,61\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:08:19,61\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:14:05,49\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:14:05,49\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:14:50,67\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:14:50,67\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:16:21,25\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:16:21,25\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:17:14,22\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:17:14,22\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:20:12,85\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:20:12,85\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:22:06,73\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:22:06,73\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:23:24,49\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:23:24,49\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:24:26,33\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:24:26,33\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:24:59,96\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:24:59,96\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:26:06,93\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:26:06,93\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:27:23,58\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:27:23,58\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:28:53,97\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:28:53,97\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:29:27,67\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:29:27,67\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:33:32,86\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:33:32,86\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:34:18,42\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:34:18,42\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:34:57,50\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:34:57,50\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:35:39,65\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:35:39,65\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:36:14,72\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:36:14,72\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:36:47,54\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:36:47,54\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:37:16,36\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:37:16,36\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:37:50,50\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:37:50,50\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:38:21,83\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:38:21,83\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:38:56,62\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:38:56,62\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:41:10,25\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:41:10,25\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:44:33,53\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:44:33,53\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:47:04,18\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:47:04,18\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:48:26,02\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:48:26,02\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:49:31,70\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:49:31,70\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:51:54,59\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:51:54,59\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:58:53,17\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:58:53,17\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  4:59:59,26\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  4:59:59,26\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  5:02:16,75\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  5:02:16,75\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  5:03:35,60\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  5:03:35,60\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  5:08:00,07\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  5:08:00,07\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  5:10:20,90\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  5:10:20,90\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  5:13:37,91\", \"pattern\": \"daily-triage\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  5:13:37,91\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  5:28:12,81\", \"pattern\": \"ci-sweeper\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  5:28:12,81\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  5:29:25,34\", \"pattern\": \"dependency-sweeper\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  5:29:25,34\", \"duration_ms\": 0} 
-{\"run_id\": \"07/07/2026  5:30:41,60\", \"pattern\": \"dependency-sweeper\", \"outcome\": \"completed\", \"timestamp\": \"07/07/2026  5:30:41,60\", \"duration_ms\": 0} 
+{"run_id":"2026-07-08T02:55:12.898Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:12.898Z","duration_ms":27}
+{"run_id":"2026-07-08T02:55:12.932Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:12.932Z","duration_ms":31}
+{"run_id":"2026-07-08T02:55:12.960Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:12.960Z","duration_ms":26}
+{"run_id":"2026-07-08T02:55:13.134Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:13.134Z","duration_ms":27}
+{"run_id":"2026-07-08T02:55:13.168Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:13.168Z","duration_ms":31}
+{"run_id":"2026-07-08T02:55:13.196Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:13.196Z","duration_ms":25}
+{"run_id":"2026-07-08T02:55:13.354Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:13.354Z","duration_ms":22}
+{"run_id":"2026-07-08T02:55:13.376Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:13.376Z","duration_ms":20}
+{"run_id":"2026-07-08T02:55:13.399Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:13.399Z","duration_ms":21}
+{"run_id":"2026-07-08T02:55:15.909Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:15.909Z","duration_ms":22}
+{"run_id":"2026-07-08T02:55:15.931Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:15.931Z","duration_ms":20}
+{"run_id":"2026-07-08T02:55:15.952Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:15.952Z","duration_ms":20}
+{"run_id":"2026-07-08T02:55:16.215Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:16.215Z","duration_ms":24}
+{"run_id":"2026-07-08T02:55:16.238Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:16.238Z","duration_ms":21}
+{"run_id":"2026-07-08T02:55:16.261Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:16.261Z","duration_ms":22}
+{"run_id":"2026-07-08T02:55:16.529Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:16.529Z","duration_ms":23}
+{"run_id":"2026-07-08T02:55:16.552Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:16.552Z","duration_ms":21}
+{"run_id":"2026-07-08T02:55:16.573Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:16.573Z","duration_ms":19}
+{"run_id":"2026-07-08T02:55:18.116Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:18.116Z","duration_ms":25}
+{"run_id":"2026-07-08T02:55:18.136Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:18.136Z","duration_ms":24}
+{"run_id":"2026-07-08T02:55:18.138Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:18.138Z","duration_ms":21}
+{"run_id":"2026-07-08T02:55:18.160Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:18.160Z","duration_ms":22}
+{"run_id":"2026-07-08T02:55:18.186Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T02:55:18.186Z","duration_ms":23}
+{"run_id":"2026-07-08T03:06:53.451Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.451Z","duration_ms":27}
+{"run_id":"2026-07-08T03:06:53.487Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.487Z","duration_ms":33}
+{"run_id":"2026-07-08T03:06:53.516Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.516Z","duration_ms":27}
+{"run_id":"2026-07-08T03:06:53.693Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.693Z","duration_ms":28}
+{"run_id":"2026-07-08T03:06:53.727Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.727Z","duration_ms":32}
+{"run_id":"2026-07-08T03:06:53.757Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.757Z","duration_ms":27}
+{"run_id":"2026-07-08T03:06:53.926Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.926Z","duration_ms":23}
+{"run_id":"2026-07-08T03:06:53.949Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.949Z","duration_ms":21}
+{"run_id":"2026-07-08T03:06:53.971Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:53.971Z","duration_ms":21}
+{"run_id":"2026-07-08T03:06:56.435Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:56.435Z","duration_ms":22}
+{"run_id":"2026-07-08T03:06:56.459Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:56.460Z","duration_ms":22}
+{"run_id":"2026-07-08T03:06:56.483Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:56.483Z","duration_ms":21}
+{"run_id":"2026-07-08T03:06:56.741Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:56.741Z","duration_ms":24}
+{"run_id":"2026-07-08T03:06:56.763Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:56.763Z","duration_ms":21}
+{"run_id":"2026-07-08T03:06:56.785Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:56.785Z","duration_ms":20}
+{"run_id":"2026-07-08T03:06:57.059Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:57.059Z","duration_ms":22}
+{"run_id":"2026-07-08T03:06:57.082Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:57.082Z","duration_ms":21}
+{"run_id":"2026-07-08T03:06:57.104Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:57.104Z","duration_ms":20}
+{"run_id":"2026-07-08T03:06:58.669Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:58.669Z","duration_ms":23}
+{"run_id":"2026-07-08T03:06:58.675Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:58.675Z","duration_ms":26}
+{"run_id":"2026-07-08T03:06:58.694Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:58.694Z","duration_ms":22}
+{"run_id":"2026-07-08T03:06:58.698Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:58.698Z","duration_ms":20}
+{"run_id":"2026-07-08T03:06:58.716Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:58.716Z","duration_ms":20}
+{"run_id":"2026-07-08T03:06:58.721Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:06:58.721Z","duration_ms":21}
+{"run_id":"2026-07-08T03:25:55.810Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:55.810Z","duration_ms":27}
+{"run_id":"2026-07-08T03:25:55.843Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:55.843Z","duration_ms":30}
+{"run_id":"2026-07-08T03:25:55.871Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:55.871Z","duration_ms":26}
+{"run_id":"2026-07-08T03:25:56.049Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:56.049Z","duration_ms":27}
+{"run_id":"2026-07-08T03:25:56.083Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:56.083Z","duration_ms":30}
+{"run_id":"2026-07-08T03:25:56.111Z","pattern":"test-fixture","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:56.111Z","duration_ms":25}
+{"run_id":"2026-07-08T03:25:56.278Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:56.278Z","duration_ms":21}
+{"run_id":"2026-07-08T03:25:56.299Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:56.299Z","duration_ms":20}
+{"run_id":"2026-07-08T03:25:56.322Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:56.322Z","duration_ms":21}
+{"run_id":"2026-07-08T03:25:58.530Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:58.530Z","duration_ms":21}
+{"run_id":"2026-07-08T03:25:58.552Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:58.552Z","duration_ms":20}
+{"run_id":"2026-07-08T03:25:58.574Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:58.574Z","duration_ms":20}
+{"run_id":"2026-07-08T03:25:58.840Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:58.840Z","duration_ms":24}
+{"run_id":"2026-07-08T03:25:58.862Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:58.862Z","duration_ms":20}
+{"run_id":"2026-07-08T03:25:58.884Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:58.884Z","duration_ms":21}
+{"run_id":"2026-07-08T03:25:59.156Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:59.156Z","duration_ms":22}
+{"run_id":"2026-07-08T03:25:59.178Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:59.178Z","duration_ms":20}
+{"run_id":"2026-07-08T03:25:59.206Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:25:59.206Z","duration_ms":26}
+{"run_id":"2026-07-08T03:26:00.738Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:26:00.738Z","duration_ms":24}
+{"run_id":"2026-07-08T03:26:00.764Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:26:00.764Z","duration_ms":23}
+{"run_id":"2026-07-08T03:26:00.767Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:26:00.767Z","duration_ms":23}
+{"run_id":"2026-07-08T03:26:00.788Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:26:00.788Z","duration_ms":21}
+{"run_id":"2026-07-08T03:26:00.791Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:26:00.791Z","duration_ms":22}
+{"run_id":"2026-07-08T03:26:00.814Z","pattern":"demo","runs_count":1,"outcome":"pass","timestamp":"2026-07-08T03:26:00.814Z","duration_ms":21}
