@@ -139,3 +139,14 @@ tasks:
       This is the hard gate — no LLM judgment, command exit code decides pass/fail."
       --dir "{{TARGET_DIR}}"
     timeoutMs: 120000
+
+  # OPTIONAL deploy stage — enable ONLY if the final goal is a running app, and obtain
+  # human approval before any push/merge (AGENTS.md). Leave commented out for a
+  # build-from-scratch goal whose output is tested code, not a deployed service. When
+  # enabled, the last stage becomes `deploy`; when commented, `verify` stays last.
+  # - id: deploy
+  #   command: >-
+  #     opencode run "Ship {{TARGET_DIR}} using its existing CI/CD pipeline. Do NOT push or
+  #     merge without an explicit prior human approval in this session. Write the deploy
+  #     result to {{TARGET_DIR}}/.build/deploy.log and exit 0 only on success." --dir "{{TARGET_DIR}}"
+  #   timeoutMs: 180000
