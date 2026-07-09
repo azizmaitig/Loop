@@ -630,7 +630,8 @@ function badgeHtml(status) {
   if (s === 'running' || s === 'active') cls = 'running';
   else if (s === 'pending' || s === 'queued') cls = 'pending';
   else if (s === 'completed' || s === 'success' || s === 'done') cls = 'completed';
-  else if (s === 'failed' || s === 'error') cls = 'failed';
+  else if (s === 'pass') cls = 'completed';
+  else if (s === 'failed' || s === 'error' || s === 'fail') cls = 'failed';
   else if (s === 'stopped' || s === 'idle') cls = 'stopped';
   else cls = 'pending';
   return '<span class="badge ' + cls + '">' + esc(status || 'unknown') + '</span>';
