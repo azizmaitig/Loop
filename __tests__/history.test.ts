@@ -19,14 +19,11 @@ function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: "task-test-1",
     command: "echo hello",
-    status: "completed",
+    lifecycle: "completed",
     createdAt: "2026-07-05T00:00:00.000Z",
     startedAt: "2026-07-05T00:00:01.000Z",
     completedAt: "2026-07-05T00:00:02.000Z",
-    exitCode: 0,
-    stdout: "hello",
-    stderr: "",
-    durationMs: 1000,
+    result: { status: 'pass', exitCode: 0, stdout: "hello", stderr: "", durationMs: 1000 },
     ...overrides,
   };
 }
@@ -43,9 +40,9 @@ describe("history", () => {
     expect(entry).not.toBeNull();
     expect(entry!.task.id).toBe("task-test-1");
     expect(entry!.task.command).toBe("echo hello");
-    expect(entry!.task.status).toBe("completed");
-    expect(entry!.task.exitCode).toBe(0);
-    expect(entry!.task.stdout).toBe("hello");
+    expect(entry!.task.lifecycle).toBe("completed");
+    expect(entry!.task.result?.exitCode).toBe(0);
+    expect(entry!.task.result?.stdout).toBe("hello");
     expect(entry!.phases).toEqual([]);
   });
 
@@ -120,18 +117,17 @@ describe("history", () => {
   test("saveTaskHistory handles failed tasks", async () => {
     const task = makeTask({
       id: "task-failed-1",
-      status: "failed",
-      exitCode: 1,
-      stderr: "command not found",
+      lifecycle: "failed",
+      result: { exitCode: 1, stdout: "", stderr: "command not found", durationMs: 500 },
       error: "execution failed",
     });
     await saveTaskHistory(tmpDir, task);
 
     const entry = await readTaskHistory(tmpDir, "task-failed-1");
-    expect(entry!.task.status).toBe("failed");
-    expect(entry!.task.exitCode).toBe(1);
+    expect(entry!.task.lifecycle).toBe("failed");
+    expect(entry!.task.result?.exitCode).toBe(1);
+    expect(entry!.task.result?.stderr).toBe("command not found");
     expect(entry!.task.error).toBe("execution failed");
-    expect(entry!.task.stderr).toBe("command not found");
   });
 
   test("readTaskHistory returns full HistoryEntry with all fields", async () => {
@@ -143,8 +139,8 @@ describe("history", () => {
     expect(entry!.task.createdAt).toBe("2026-07-05T00:00:00.000Z");
     expect(entry!.task.startedAt).toBe("2026-07-05T00:00:01.000Z");
     expect(entry!.task.completedAt).toBe("2026-07-05T00:00:02.000Z");
-    expect(entry!.task.exitCode).toBe(0);
-    expect(entry!.task.stdout).toBe("hello");
-    expect(entry!.task.durationMs).toBe(1000);
+    expect(entry!.task.result?.exitCode).toBe(0);
+    expect(entry!.task.result?.stdout).toBe("hello");
+    expect(entry!.task.result?.durationMs).toBe(1000);
   });
 });

@@ -9,25 +9,24 @@ function makePhase(overrides?: Partial<PhaseDef>): PhaseDef {
   return {
     name: "test",
     command: "echo hello",
+    expectedExitCode: 0,
     timeoutMs: 5000,
-    evalPrompt: "",
-    evalModel: "",
     ...overrides,
   };
 }
 
 function makeConfig(phases: PhaseDef[] = [makePhase()]): LoopConfig {
   return {
-    planPath: "",
+    taskName: "test",
     maxIterations: 3,
-    mode: "single-run",
+    phaseTimeoutMs: 30000,
     phases,
   };
 }
 
 function makeState(overrides?: Partial<LoopState>): LoopState {
   return {
-    currentState: 'idle',
+    currentState: 'init',
     iteration: 1,
     phaseResults: {},
     startTime: new Date().toISOString(),

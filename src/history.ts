@@ -21,15 +21,12 @@ export async function saveTaskHistory(
     task: {
       id: task.id,
       command: task.command,
-      status: task.status,
+      lifecycle: task.lifecycle,
       createdAt: task.createdAt,
       startedAt: task.startedAt,
       completedAt: task.completedAt,
       timeoutMs: task.timeoutMs,
-      exitCode: task.exitCode,
-      stdout: task.stdout,
-      stderr: task.stderr,
-      durationMs: task.durationMs,
+      result: task.result,
       error: task.error,
     },
     phases: phases ?? [],
@@ -80,11 +77,11 @@ export async function listTaskHistory(
       tasks.push({
         id: entry.task.id,
         command: entry.task.command,
-        status: entry.task.status,
+        status: (entry.task as { status?: string }).status ?? entry.task.lifecycle,
         createdAt: entry.task.createdAt,
         completedAt: entry.task.completedAt,
-        durationMs: entry.task.durationMs,
-        exitCode: entry.task.exitCode,
+        durationMs: entry.task.durationMs ?? entry.task.result?.durationMs,
+        exitCode: entry.task.exitCode ?? entry.task.result?.exitCode,
       });
     }
   }

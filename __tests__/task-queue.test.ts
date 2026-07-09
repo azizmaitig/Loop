@@ -7,7 +7,7 @@ describe("TaskQueue", () => {
     const task = q.enqueue("echo hi");
     expect(task.id).toMatch(/^task-/);
     expect(task.command).toBe("echo hi");
-    expect(task.status).toBe("queued");
+    expect(task.lifecycle).toBe("queued");
     expect(typeof task.createdAt).toBe("string");
   });
 
@@ -28,7 +28,7 @@ describe("TaskQueue", () => {
     q.enqueue("echo hi");
     const task = q.dequeue();
     expect(task).not.toBeNull();
-    expect(task!.status).toBe("running");
+    expect(task!.lifecycle).toBe("running");
     expect(task!.startedAt).toBeDefined();
     expect(q.current).toBe(task);
     expect(q.length).toBe(0);
@@ -49,10 +49,10 @@ describe("TaskQueue", () => {
     const task = q.dequeue()!;
     const result = q.complete(task.id, { exitCode: 0, stdout: "hi", stderr: "", durationMs: 10 });
     expect(result).not.toBeNull();
-    expect(result!.status).toBe("completed");
-    expect(result!.exitCode).toBe(0);
-    expect(result!.stdout).toBe("hi");
-    expect(result!.durationMs).toBe(10);
+    expect(result!.lifecycle).toBe("completed");
+    expect(result!.result?.exitCode).toBe(0);
+    expect(result!.result?.stdout).toBe("hi");
+    expect(result!.result?.durationMs).toBe(10);
     expect(result!.completedAt).toBeDefined();
     expect(q.current).toBeNull();
   });
@@ -67,7 +67,7 @@ describe("TaskQueue", () => {
     q.enqueue("bad");
     const task = q.dequeue()!;
     q.fail(task.id, "something went wrong");
-    expect(task.status).toBe("failed");
+    expect(task.lifecycle).toBe("failed");
     expect(task.error).toBe("something went wrong");
     expect(q.current).toBeNull();
   });
@@ -87,7 +87,7 @@ describe("TaskQueue", () => {
     const task = q.enqueue("task2");
     const result = q.cancel(task.id);
     expect(result).not.toBeNull();
-    expect(result!.status).toBe("cancelled");
+    expect(result!.lifecycle).toBe("cancelled");
     expect(q.length).toBe(1);
   });
 
@@ -96,7 +96,7 @@ describe("TaskQueue", () => {
     q.enqueue("task1");
     const task = q.dequeue()!;
     expect(q.cancel(task.id)).toBeNull();
-    expect(task.status).toBe("running");
+    expect(task.lifecycle).toBe("running");
   });
 
   test("cancel returns null for unknown id", () => {
@@ -207,16 +207,16 @@ describe("TaskQueue", () => {
     const q = new TaskQueue();
     const t = q.enqueue("echo hello");
 
-    expect(t.status).toBe("queued");
+    expect(t.lifecycle).toBe("queued");
     const running = q.dequeue()!;
     expect(running.id).toBe(t.id);
-    expect(running.status).toBe("running");
+    expect(running.lifecycle).toBe("running");
 
     q.complete(t.id, { exitCode: 0, stdout: "hello", stderr: "", durationMs: 50 });
-    expect(t.status).toBe("completed");
-    expect(t.exitCode).toBe(0);
-    expect(t.stdout).toBe("hello");
-    expect(t.durationMs).toBe(50);
+    expect(t.lifecycle).toBe("completed");
+    expect(t.result?.exitCode).toBe(0);
+    expect(t.result?.stdout).toBe("hello");
+    expect(t.result?.durationMs).toBe(50);
     expect(t.completedAt).toBeDefined();
     expect(q.current).toBeNull();
     expect(q.history.length).toBe(1);

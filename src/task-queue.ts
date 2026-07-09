@@ -1,4 +1,4 @@
-import type { Task, TaskStatus, TaskQueueState } from './types.js';
+import type { ExecutionResult, Task, TaskStatus, TaskQueueState } from './types.js';
 
 let taskIdCounter = 0;
 
@@ -18,7 +18,7 @@ export class TaskQueue {
     const task: Task = {
       id: generateId(),
       command,
-      status: 'queued',
+      lifecycle: 'queued',
       createdAt: new Date().toISOString(),
       timeoutMs: opts?.timeoutMs,
       llm: opts?.llm,
@@ -31,21 +31,18 @@ export class TaskQueue {
     if (this.currentTask) return null;
     const task = this.queue.shift();
     if (!task) return null;
-    task.status = 'running';
+    task.lifecycle = 'running';
     task.startedAt = new Date().toISOString();
     this.currentTask = task;
     return task;
   }
 
-  complete(id: string, result: { exitCode: number; stdout: string; stderr: string; durationMs: number }): Task | null {
+  complete(id: string, result: ExecutionResult): Task | null {
     const task = this.get(id);
     if (!task || task !== this.currentTask) return null;
-    task.status = 'completed';
+    task.lifecycle = 'completed';
     task.completedAt = new Date().toISOString();
-    task.exitCode = result.exitCode;
-    task.stdout = result.stdout;
-    task.stderr = result.stderr;
-    task.durationMs = result.durationMs;
+    task.result = result;
     this.completedIds.unshift(id);
     this.currentTask = null;
     return task;
@@ -54,7 +51,7 @@ export class TaskQueue {
   fail(id: string, error: string): Task | null {
     const task = this.get(id);
     if (!task) return null;
-    task.status = 'failed';
+    task.lifecycle = 'failed';
     task.completedAt = new Date().toISOString();
     task.error = error;
     this.completedIds.unshift(id);
@@ -70,8 +67,8 @@ export class TaskQueue {
   cancel(id: string): Task | null {
     const task = this.get(id);
     if (!task) return null;
-    if (task.status === 'running') return null; // cannot cancel running task
-    task.status = 'cancelled';
+    if (task.lifecycle === 'running') return null; // cannot cancel running task
+    task.lifecycle = 'cancelled';
     task.completedAt = new Date().toISOString();
     this.completedIds.unshift(id);
     this.queue = this.queue.filter(t => t.id !== id);

@@ -150,7 +150,7 @@ describe("Daemon (v6)", () => {
       expect(resp.status).toBe(201);
       const body = await resp.json();
       expect(body.id).toMatch(/^task-/);
-      expect(body.status).toBe("queued");
+      expect(body.lifecycle).toBe("queued");
     } finally {
       d.stop();
       await startPromise;

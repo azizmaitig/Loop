@@ -18,14 +18,6 @@ describe("plan-driven loop mode", () => {
     expect(args.daemon).toBe(true);
   });
 
-  test("missing plan file exits with clear error", () => {
-    // When --plan points to a non-existent file, the loop should report a meaningful error
-    // This test validates the error shape, not the implementation
-    expect(() => {
-      throw new Error("Plan file not found: missing.yaml");
-    }).toThrow("Plan file not found");
-  });
-
   test("planPath overrides --task when both are specified", () => {
     // plan-driven mode should take precedence over built-in task selection
     const args = parseArgs(["start", "--plan", "deploy.yaml", "--task", "demo"]);

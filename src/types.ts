@@ -35,12 +35,17 @@ export interface LoopConfig {
   memory?: MemoryConfig;
 }
 
-export interface PhaseResult {
-  status: 'pass' | 'fail' | 'error';
+export type OutcomeStatus = 'pass' | 'fail' | 'error';
+
+export interface ExecutionResult {
+  status: OutcomeStatus;
   exitCode: number;
   stdout: string;
   stderr: string;
   durationMs: number;
+}
+
+export interface PhaseResult extends ExecutionResult {
   evidencePath: string;
   judgment?: Judgment;
   pluginResults?: Record<string, any>;
@@ -85,7 +90,13 @@ export interface CheckpointState {
   updatedAt: string;
   completedTaskIds: string[];
   inProgressTaskId: string | null;
-  results: Record<string, { status: string; durationMs: number; exitCode: number }>;
+  results: Record<string, CheckpointEntry>;
+}
+
+export interface CheckpointEntry {
+  status: OutcomeStatus;
+  durationMs: number;
+  exitCode: number;
 }
 
 export interface PlanContext {
@@ -109,16 +120,13 @@ export type TaskStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancel
 export interface Task {
   id: string;
   command: string;
-  status: TaskStatus;
+  lifecycle: TaskStatus;
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
   timeoutMs?: number;
   error?: string;
-  exitCode?: number;
-  stdout?: string;
-  stderr?: string;
-  durationMs?: number;
+  result?: ExecutionResult;
   llm?: { mcpServer: string; tool: string; prompt: string };
 }
 

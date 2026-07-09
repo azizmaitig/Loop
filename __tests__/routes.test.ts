@@ -97,7 +97,7 @@ describe("routes — createFetchHandler", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.id).toBeDefined();
-    expect(body.status).toBe("queued");
+    expect(body.lifecycle).toBe("queued");
     expect(api.taskQueue.length).toBe(1);
   });
 

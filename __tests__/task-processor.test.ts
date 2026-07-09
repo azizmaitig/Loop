@@ -49,7 +49,7 @@ describe("executeTask", () => {
 
     // ponytail: taskQueue.get() returns undefined after complete() nulls currentTask
     // Check the task object that was passed in directly
-    expect(dequeued.status).toBe("failed");
+    expect(dequeued.lifecycle).toBe("failed");
     expect(dequeued.error).toContain("unsafe");
   });
 
@@ -60,9 +60,9 @@ describe("executeTask", () => {
 
     await executeTask(dequeued, ctx);
 
-    expect(dequeued.status).toBe("completed");
-    expect(dequeued.exitCode).toBe(0);
-    expect(dequeued.stdout).toBe("hello world");
+    expect(dequeued.lifecycle).toBe("completed");
+    expect(dequeued.result?.exitCode).toBe(0);
+    expect(dequeued.result?.stdout).toBe("hello world");
   });
 
   test("captures non-zero exit codes", async () => {
@@ -72,8 +72,8 @@ describe("executeTask", () => {
 
     await executeTask(dequeued, ctx);
 
-    expect(dequeued.status).toBe("completed");
-    expect(dequeued.exitCode).toBe(42);
+    expect(dequeued.lifecycle).toBe("completed");
+    expect(dequeued.result?.exitCode).toBe(42);
   });
 
   test("handles LLM task shape gracefully (no real API key)", async () => {
@@ -85,7 +85,7 @@ describe("executeTask", () => {
 
     await executeTask(dequeued, ctx);
 
-    expect(dequeued.status).toBe("failed");
+    expect(dequeued.lifecycle).toBe("failed");
   });
 });
 
@@ -93,7 +93,7 @@ describe("executeTask", () => {
 
 describe("processQueue", () => {
   test("processes a single task successfully", async () => {
-    const ctx = fakeCtx();
+    const ctx = fakeCtx({ baseDir: '/tmp' });
     ctx.taskQueue.enqueue("echo hello");
 
     const count = await processQueue(ctx);
@@ -104,7 +104,7 @@ describe("processQueue", () => {
   });
 
   test("processes multiple tasks in order", async () => {
-    const ctx = fakeCtx();
+    const ctx = fakeCtx({ baseDir: '/tmp' });
     ctx.taskQueue.enqueue("echo first");
     ctx.taskQueue.enqueue("echo second");
     ctx.taskQueue.enqueue("echo third");
@@ -132,7 +132,7 @@ describe("processQueue", () => {
   });
 
   test("does not dequeue when paused", async () => {
-    const ctx = fakeCtx({ isPaused: async () => true });
+    const ctx = fakeCtx({ baseDir: '/tmp', isPaused: async () => true });
     ctx.taskQueue.enqueue("echo hello");
     ctx.taskQueue.enqueue("echo world");
 
@@ -144,7 +144,7 @@ describe("processQueue", () => {
 
   test("broadcasts on task completion", async () => {
     const broadcasts: unknown[] = [];
-    const ctx = fakeCtx({ broadcast: (type, data) => { broadcasts.push({ type, data }); } });
+    const ctx = fakeCtx({ baseDir: '/tmp', broadcast: (type, data) => { broadcasts.push({ type, data }); } });
     ctx.taskQueue.enqueue("echo hello");
 
     await processQueue(ctx);

@@ -68,7 +68,7 @@ export function createFetchHandler(api: DaemonAPI): (req: Request) => Response |
         });
         // Defer processing so the 201 response is sent before the task moves to 'running'
         setTimeout(() => api.maybeProcessQueue(), 0);
-        return Response.json({ id: task.id, status: task.status }, { status: 201 });
+        return Response.json({ id: task.id, lifecycle: task.lifecycle }, { status: 201 });
       } catch {
         return Response.json({ error: 'invalid JSON body' }, { status: 400 });
       }
