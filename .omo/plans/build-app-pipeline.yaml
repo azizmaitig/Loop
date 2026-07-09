@@ -1,0 +1,44 @@
+# build-app-pipeline.yaml — reusable 10-stage build-from-scratch template
+#
+# OWNER SUBSTITUTION REQUIRED BEFORE RUNNING:
+#   The executor does a literal YAML parse (no variable interpolation). Replace every
+#   {{TARGET_DIR}} below with the real absolute project path, e.g.:
+#     envsubst < .omo/plans/build-app-pipeline.yaml > /tmp/run.yaml
+#     (or:  (Get-Content .omo/plans/build-app-pipeline.yaml) -replace '\{\{TARGET_DIR\}\}', 'D:\path\to\app' | Set-Content run.yaml)
+#   Then run:  bun run loop.ts start --plan run.yaml --max-iterations 1
+#
+# PRECONDITIONS (owner-owned, NOT assumed by this template):
+#   1. L2 (source editing) MUST be enabled in AGENTS.md before running — the code/test
+#      stages edit source. This is a human runtime toggle; the template does not flip it.
+#   2. opencode MUST be on PATH (every delegating stage invokes `opencode run ...`).
+#   3. --max-iterations N: N=1 = one-shot build; N>1 = the WHOLE plan re-loops N times on
+#      pass (N full rebuilds). There is NO per-stage retry today. Hard cap 20 (config.ts).
+#
+# SAFETY RAILS (baked into every stage):
+#   R1 Infinite-loop/recovery guard (REDEFINED): the `code` stage authors healCommand +
+#      maxRetries:3 but per ADR-0009 they are NO-OPS until ADR-0011 is implemented. The real
+#      guard today is per-stage timeoutMs + command exit-0 + the --max-iterations cap.
+#   R2 Context-rot guard: every stage writes output to a FILE in {{TARGET_DIR}}/.build/;
+#      the next stage reads that file. No accumulated chat context.
+#   R3 Scope-creep guard: the code task prompt lists NON-GOALS and forbids features absent
+#      from spec.md.
+#   R4 Evidence-not-claim: verify is the non-LLM exit-0 hard gate. design-critique/review/
+#      evaluate LLM passed/false does NOT fail a phase unless the command exits non-zero
+#      (loop-runner.ts resolveHardcoded). LLM verdicts are advisory only.
+#   R5 Checkpoint/resume: relies on .checkpoint.json resume (loop-runner.ts prompts Y/n).
+
+planName: build-app
+
+tasks:
+  - id: read-state
+    command: type STATE.md
+    timeoutMs: 5000
+
+  - id: planning
+    command: >-
+      opencode run "Read {{TARGET_DIR}}/.build/STATE.md if present, otherwise infer project
+      intent from the working directory. Write a concise product spec to
+      {{TARGET_DIR}}/.build/spec.md covering: goal, users, core features (MVP scope only),
+      out-of-scope, tech-stack recommendation, and acceptance criteria. Keep it under 400
+      lines. Exit 0 when the file is written." --dir "{{TARGET_DIR}}"
+    timeoutMs: 180000
