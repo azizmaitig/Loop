@@ -27,6 +27,8 @@ export async function beforeLoop(planPath: string, resume?: boolean): Promise<Ph
     command: task.command,
     timeoutMs: task.timeoutMs ?? 30000,
     expectedExitCode: 0,
+    healCommand: task.healCommand,
+    maxRetries: task.maxRetries,
     llm: task.llm
       ? 'provider' in task.llm
         ? { provider: task.llm.provider ?? 'openai', prompt: task.llm.prompt ?? '' }
