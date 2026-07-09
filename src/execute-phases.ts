@@ -12,6 +12,7 @@
 import { evaluatePhase } from './evaluate.js';
 import { executeHooks } from './plugins.js';
 import type { Plugin, HookContext } from './plugins.js';
+import { RecoveryStrategy } from './recovery.js';
 import { updatePhaseResult } from './state.js';
 import type { PhaseDef, PhaseResult, LoopState, LoopConfig, PlanYamlDoc } from './types.js';
 import { logPhaseContext } from './memory-hooks.js';
@@ -102,10 +103,26 @@ export async function executePhaseGroup(
     }
 
     if (result.status !== 'pass') {
-      // Post-execution recovery for phases is a failTerminal outcome: the phase
-      // ran and did not pass, so notify the caller. (Auto-heal via healCommand/
-      // maxRetries was dead code — PhaseDef never carries those fields in
-      // plan-driven mode — and is intentionally left unwired; see ADR-0009.)
+      // ADR-0011 heal seam: phases with healCommand get up to maxRetries heal
+      // attempts (re-run phase command); success bypasses failTerminal.
+      if (phase.healCommand) {
+        const { healed } = await RecoveryStrategy.healAndRetry(
+          {
+            taskQueue: { fail: () => {}, get: () => undefined } as never,
+            broadcast: () => {},
+            runCommand: (cmd: string, timeoutMs?: number) =>
+              runCommand(cmd, { timeoutMs }),
+          },
+          phase,
+          result,
+          { healCommand: phase.healCommand, maxRetries: phase.maxRetries ?? 1 },
+        );
+        if (healed) {
+          console.log(`HEALED (${totalPhaseMs}ms)`);
+          await deps.writeState(state);
+          continue;
+        }
+      }
       deps.onPhaseFailed(phase, result);
     }
 
