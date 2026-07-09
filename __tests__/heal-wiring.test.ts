@@ -34,6 +34,14 @@ function makePhase(overrides?: Partial<PhaseDef>): PhaseDef {
   };
 }
 
+// Node's `node -e "..."` embeds the path inside a JS single-quoted string, where
+// backslash is an escape char (e.g. "\U" silently drops the backslash). Use
+// forward-slash paths so the heal/phase node one-liners are quoting-agnostic
+// and do not depend on cmd.exe quote-stripping behavior.
+const SAFE_DIR = dir.replace(/\\/g, "/");
+const SAFE_COUNTER = COUNTER.replace(/\\/g, "/");
+const SAFE_MARKER = MARKER.replace(/\\/g, "/");
+
 function makeConfig(phases: PhaseDef[]): LoopConfig {
   return { taskName: "test", maxIterations: 1, phaseTimeoutMs: 30000, phases };
 }
@@ -54,8 +62,8 @@ describe("heal wiring (ADR-0011) — executePhaseGroup", () => {
     const failed: string[] = [];
     // Heal writes the marker file; the phase command passes only once the marker
     // exists, so the healAndRetry re-run of the phase command succeeds.
-    const phaseCmd = `node -e "process.exit(require('fs').existsSync('${MARKER}')?0:1)"`;
-    const healCmd = `node -e "require('fs').writeFileSync('${MARKER}','1')"`;
+    const phaseCmd = `node -e "process.exit(require('fs').existsSync('${SAFE_MARKER}')?0:1)"`;
+    const healCmd = `node -e "require('fs').writeFileSync('${SAFE_MARKER}','1')"`;
 
     const deps = makeDeps({
       config: makeConfig([makePhase({ name: "code", command: phaseCmd, healCommand: healCmd, maxRetries: 1 })]),
@@ -72,7 +80,7 @@ describe("heal wiring (ADR-0011) — executePhaseGroup", () => {
   test("heal-exhaust: healCommand never makes the phase pass ends fail after maxRetries attempts", async () => {
     const failed: string[] = [];
     // heal appends one line to COUNTER then exits 1 (never heals); phase always fails.
-    const healCmd = `echo heal >> ${COUNTER} & exit /b 1`;
+    const healCmd = `echo heal >> ${SAFE_COUNTER} & exit /b 1`;
 
     const deps = makeDeps({
       config: makeConfig([makePhase({ name: "code", command: "cmd.exe /c exit 1", healCommand: healCmd, maxRetries: 3 })]),
