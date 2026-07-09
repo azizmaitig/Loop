@@ -42,3 +42,37 @@ tasks:
       out-of-scope, tech-stack recommendation, and acceptance criteria. Keep it under 400
       lines. Exit 0 when the file is written." --dir "{{TARGET_DIR}}"
     timeoutMs: 180000
+
+  - id: research
+    command: >-
+      opencode run "Read {{TARGET_DIR}}/.build/spec.md. Research the recommended tech stack and
+      the top 3-5 risks/unknowns for this MVP (library choices, integration gotchas, perf
+      ceilings). Write findings to {{TARGET_DIR}}/.build/research.md: for each risk give
+      evidence, a recommended approach, and a fallback. Do NOT write code. Exit 0 when the
+      file is written." --dir "{{TARGET_DIR}}"
+    timeoutMs: 180000
+
+  - id: design
+    command: >-
+      opencode run "Read {{TARGET_DIR}}/.build/spec.md and {{TARGET_DIR}}/.build/research.md.
+      Produce a concrete technical design in {{TARGET_DIR}}/.build/design.md: module/component
+      breakdown, data model, API surface, key algorithms, file layout, and a build/test
+      strategy. Also note any design decisions needing an ADR. Do NOT write application code.
+      Exit 0 when the file is written." --dir "{{TARGET_DIR}}"
+    timeoutMs: 180000
+
+  - id: design-critique
+    command: >-
+      opencode run "Read {{TARGET_DIR}}/.build/design.md and {{TARGET_DIR}}/.build/spec.md.
+      Critique the design against the spec: missing requirements, over-engineering, security
+      or scalability gaps, and unclear interfaces. Write the verdict to
+      {{TARGET_DIR}}/.build/design-critique.md with an explicit APPROVE or REVISE decision and
+      a prioritized list of issues (P0-P2). Do NOT modify any source files. Exit 0 when the
+      file is written." --dir "{{TARGET_DIR}}"
+    timeoutMs: 120000
+    llm:
+      provider: opencode
+      prompt: >-
+        You are a senior architecture reviewer. Stdout holds the design-critique.md content.
+        Return JSON: { "passed": boolean (true=APPROVE, false=REVISE), "reason": "markdown
+        report with P0-P2 issues and whether design meets spec", "confidence": 0.0-1.0 }.
