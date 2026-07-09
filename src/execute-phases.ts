@@ -4,8 +4,9 @@
  * Both callers construct an ExecutionDeps and call executePhaseGroup(),
  * extracting ~50 LOC of duplication from each.
  *
- * v0.7+: executePhaseGroup handles auto-heal (healCommand/maxRetries on verify tasks)
- * and checkpoint persistence after every completed phase.
+ * executePhaseGroup reports phase outcomes through deps.onPhaseFailed (the
+ * failTerminal recovery seam) and persists a checkpoint after every completed
+ * phase. Recovery/guard logic lives in recovery.ts (ADR-0009).
  */
 
 import { evaluatePhase } from './evaluate.js';
@@ -101,35 +102,10 @@ export async function executePhaseGroup(
     }
 
     if (result.status !== 'pass') {
-      // Auto-heal: if phase config carries a healCommand, attempt retry
-      const taskHealCmd = (phase as unknown as Record<string, unknown>).healCommand as string | undefined;
-      const taskMaxRetries = (phase as unknown as Record<string, unknown>).maxRetries as number | undefined;
-      if (deps.planPath && taskHealCmd && taskMaxRetries && taskMaxRetries > 0) {
-        for (let attempt = 1; attempt <= taskMaxRetries; attempt++) {
-          process.stdout.write(`  heal attempt ${attempt}/${taskMaxRetries}... `);
-          try {
-            const healResult = await executeShellCommand(taskHealCmd, deps.config.phaseTimeoutMs ?? 30000);
-            if (healResult.status === 'pass') {
-              // Re-run the verify phase after successful heal
-              const retryResult = await executeShellCommand(phase.command, phase.timeoutMs);
-              if (retryResult.status === 'pass') {
-                Object.assign(result, retryResult);
-                result.status = 'pass';
-                result.judgment = undefined;
-                allPassed = true;
-                console.log(`healed — PASS (${retryResult.durationMs}ms)`);
-                break;
-              }
-              console.log(`heal OK but verify still FAIL (${retryResult.durationMs}ms)`);
-            } else {
-              console.log(`heal FAIL (${healResult.durationMs}ms)`);
-            }
-          } catch {
-            console.log('heal ERROR');
-          }
-        }
-      }
-
+      // Post-execution recovery for phases is a failTerminal outcome: the phase
+      // ran and did not pass, so notify the caller. (Auto-heal via healCommand/
+      // maxRetries was dead code — PhaseDef never carries those fields in
+      // plan-driven mode — and is intentionally left unwired; see ADR-0009.)
       deps.onPhaseFailed(phase, result);
     }
 

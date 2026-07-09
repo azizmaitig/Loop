@@ -16,6 +16,7 @@ import { updateStateMd } from './state.js';
 import type { StateMdFrontmatter } from './state.js';
 import { checkBudget } from './budget.js';
 import { isSafeCommand, runCommand } from './shell.js';
+import { Guard, RecoveryStrategy, type RecoveryContext } from './recovery.js';
 
 /**
  * Dependencies injected into every task-processing operation.
@@ -34,6 +35,10 @@ export interface TaskContext {
  */
 export async function executeTask(task: Task, ctx: TaskContext): Promise<void> {
   const { taskQueue, baseDir, broadcast } = ctx;
+
+  // Post-execution recovery for a failed task routes through RecoveryStrategy
+  // (ADR-0009). failTerminal marks the task failed and broadcasts completion.
+  const recovery: RecoveryContext = { taskQueue, broadcast };
 
   // LLM task — call the LLM provider directly instead of spawning a shell command
   if (task.llm && 'prompt' in task.llm) {
@@ -55,15 +60,13 @@ export async function executeTask(task: Task, ctx: TaskContext): Promise<void> {
       broadcast('task_completed', taskQueue.get(task.id));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      taskQueue.fail(task.id, msg);
-      broadcast('task_completed', taskQueue.get(task.id));
+      RecoveryStrategy.failTerminal(recovery, task, msg);
     }
     return;
   }
 
   if (!isSafeCommand(task.command)) {
-    taskQueue.fail(task.id, 'Command rejected: unsafe shell metacharacters detected');
-    broadcast('task_completed', taskQueue.get(task.id));
+    RecoveryStrategy.failTerminal(recovery, task, 'Command rejected: unsafe shell metacharacters detected');
     return;
   }
 
@@ -71,6 +74,7 @@ export async function executeTask(task: Task, ctx: TaskContext): Promise<void> {
   const isOpencode = task.command.startsWith('opencode');
   const parts = task.command.split(/\s+/).filter(Boolean);
   const isPs1 = parts.length > 0 && parts[0].toLowerCase().endsWith('.ps1');
+  console.error('[SISYPHUS-DEBUG] isOpencode:', isOpencode, 'isPs1:', isPs1, 'parts:', JSON.stringify(parts));
   const timeoutMs = isOpencode ? (task.timeoutMs ?? 300000) : (task.timeoutMs ?? 60000);
 
   try {
@@ -109,8 +113,7 @@ export async function executeTask(task: Task, ctx: TaskContext): Promise<void> {
     broadcast('task_completed', taskQueue.get(task.id));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    taskQueue.fail(task.id, msg);
-    broadcast('task_completed', taskQueue.get(task.id));
+    RecoveryStrategy.failTerminal(recovery, task, msg);
   }
 }
 
@@ -123,23 +126,35 @@ export async function executeTask(task: Task, ctx: TaskContext): Promise<void> {
 export async function processQueue(ctx: TaskContext): Promise<number> {
   const { taskQueue, baseDir, getState, isPaused, broadcast } = ctx;
 
-  // Budget guard: check daily run cap before processing
+  // Budget guard (pre-execution): report-only / exceeded budgets block execution.
+  // This is a Guard outcome, not a recovery (see ADR-0009) — the tasks never
+  // ran, so there is no result to recover. report_only cancels queued tasks
+  // (cancel-report); exceeded stops accepting new work (returns 0, no cancel).
   const budget = await checkBudget(baseDir);
+  const pct = Math.round((budget.runsToday / budget.cap) * 100);
   if (budget.status === 'exceeded') {
     console.error(`[daemon] Daily run cap exceeded (${budget.runsToday}/${budget.cap}), stopping`);
     return 0;
   }
   if (budget.status === 'report_only') {
-    const pct = Math.round((budget.runsToday / budget.cap) * 100);
     console.error(`[daemon] Run budget at ${pct}% (${budget.runsToday}/${budget.cap}), report-only mode`);
-    // Dequeue tasks and skip execution, but still log to history
+
+    // Derive the cancel-report reason through the Guard seam so the budget
+    // gate and the per-task guard share one decision source.
+    const sentinel: Task = { id: '__guard_probe__', command: '', lifecycle: 'queued', createdAt: '' };
+    const decision = await Guard.shouldRun(
+      { baseDir, isPaused: async () => false, isSafeCommand },
+      sentinel,
+      'report_only',
+    );
+
     let cancelledCount = 0;
     while (getState().status === 'running') {
       const task = taskQueue.dequeue();
       if (!task) break;
       const cancelled = taskQueue.cancel(task.id);
       if (cancelled) {
-        cancelled.error = 'budget: report-only mode, task skipped';
+        cancelled.error = decision.reason ?? 'budget: report-only mode, task skipped';
         saveTaskHistory(baseDir, cancelled).catch(() => {});
         cancelledCount++;
       }
