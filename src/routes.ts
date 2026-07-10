@@ -8,6 +8,7 @@ import type { ServerWebSocket } from 'bun';
 import type { DaemonAPI } from './daemon-api.js';
 import type { LLMConfig, LLMProvider } from './types.js';
 import type { StateMdFrontmatter } from './state.js';
+import { computeTaskMetrics, computeBudgetMetrics, computeTriggerMetrics } from './metrics.js';
 
 /**
  * Register all HTTP/WS routes on a Bun.serve server config.
@@ -181,6 +182,16 @@ export function createFetchHandler(api: DaemonAPI): (req: Request) => Response |
       return new Response(api.dashboardHtml, {
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       });
+    }
+
+    // GET /api/metrics — computed task + budget + trigger metrics
+    if (url.pathname === '/api/metrics' && req.method === 'GET') {
+      const window = url.searchParams.get('window') || '1h';
+      const lastN = Math.max(1, parseInt(url.searchParams.get('lastN') ?? '100', 10) || 100);
+      const taskMetrics = await computeTaskMetrics(api.baseDir, lastN, window);
+      const budget = await computeBudgetMetrics(api.baseDir);
+      const triggers = computeTriggerMetrics(api.triggerManager.list());
+      return Response.json({ taskMetrics, budget, triggers });
     }
 
     // POST /api/llm — call an LLM provider directly
