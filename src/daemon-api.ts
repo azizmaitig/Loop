@@ -6,7 +6,7 @@
  */
 
 import type { ServerWebSocket } from 'bun';
-import type { DaemonStatus, Task, LLMConfig, HistoryEntry, HistoryListResponse } from './types.js';
+import type { DaemonStatus, Task, LLMConfig, HistoryEntry, HistoryListResponse, LoopState } from './types.js';
 import type { TaskQueue } from './task-queue.js';
 import type { TriggerManager } from './triggers.js';
 import type { LoopOrchestrator } from './orchestrator.js';

@@ -7,7 +7,7 @@ import { CronTrigger, FileWatchTrigger, TriggerManager } from './triggers.js';
 import { LoopOrchestrator } from './orchestrator.js';
 import { processQueue } from './task-processor.js';
 import type { TaskContext } from './task-processor.js';
-import { readPauseState, writeBothStates, setCurrentState, createInitialState, updateStateMd } from './state.js';
+import { readPauseState, readState, writeBothStates, setCurrentState, createInitialState, updateStateMd } from './state.js';
 import type { StateMdFrontmatter } from './state.js';
 import { createFetchHandler } from './routes.js';
 import { createTsRing } from './dashboard-api.js';
