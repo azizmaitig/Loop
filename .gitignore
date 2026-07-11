@@ -25,3 +25,9 @@ GARBAGE/
 .omo/run-continuation/
 .omo/notepads/
 _agent-loop-output/
+
+# Build artifacts, local agent config, runtime logs
+cli.exe
+loop-run-log.md
+.opencode/
+dashboard/
