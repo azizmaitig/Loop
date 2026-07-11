@@ -56,7 +56,7 @@ export async function executePhaseGroup(
   let allPassed = true;
 
   for (const phase of deps.config.phases) {
-    process.stdout.write(`[${iteration}/${deps.config.maxIterations}] ${phase.name}... `);
+    try { process.stdout.write(`[${iteration}/${deps.config.maxIterations}] ${phase.name}... `); } catch {} // CI without TTY
 
     // Plugin hooks: onPhaseStart
     const prePluginResults = await executeHooks('onPhaseStart', { phase, state }, deps.plugins);
