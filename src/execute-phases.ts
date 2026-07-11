@@ -16,6 +16,7 @@ import { RecoveryStrategy } from './recovery.js';
 import { updatePhaseResult } from './state.js';
 import type { PhaseDef, PhaseResult, LoopState, LoopConfig, PlanYamlDoc } from './types.js';
 import { logPhaseContext } from './memory-hooks.js';
+import { runCommand } from './shell.js';
 import { appendRunLog } from './run-log.js';
 import type { RunLogEntry } from './run-log.js';
 
@@ -202,8 +203,6 @@ export async function executePhaseGroup(
 }
 
 // ── Shell command executor ────────────────────────────────────────────────────
-
-import { runCommand } from './shell.js';
 
 async function executeShellCommand(
   command: string,
