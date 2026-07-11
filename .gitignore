@@ -30,4 +30,4 @@ _agent-loop-output/
 cli.exe
 loop-run-log.md
 .opencode/
-dashboard/
+/dashboard/
