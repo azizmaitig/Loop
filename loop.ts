@@ -4,9 +4,9 @@
  *
  * This file is intentionally slim. Most logic lives in:
  *   - src/cli.ts          (arg parsing, help, built-in tasks)
- *   - src/state-writer.ts (state persistence helpers)
+ *   - src/state.ts        (state persistence)
  *   - src/loop-runner.ts  (single-run loop runner)
- *   - src/daemon-runner.ts(daemon-mode loop runner)
+ *   - src/daemon.ts       (daemon-mode loop — Daemon class + runIntervalTick)
  *
  * What stays here: main(), crash handlers, and SIGINT handler.
  *
@@ -25,29 +25,31 @@ import { Daemon } from './src/daemon.js';
 import { initProject } from './src/init.js';
 import { parseArgs, printHelp, resolvePhases } from './src/cli.js';
 import type { ParsedArgs } from './src/cli.js';
-import { OUTPUT_DIR, writeBothStates, currentState } from './src/state-writer.js';
+import { OUTPUT_DIR, writeBothStates, getCurrentState, setCurrentState } from './src/state.js';
+import { StateMachine } from './src/state-machine.js';
+import { applyTransition } from './src/transition.js';
 import { runLoop } from './src/loop-runner.js';
-import { runDaemon } from './src/daemon-runner.js';
 
 // ── Crash safety: unhandled errors should not leave state stuck in 'run' ──
 
+function markStateError(state: LoopState | null, msg: string): void {
+  if (state && state.currentState === 'run') {
+    const sm = new StateMachine(state.currentState);
+    state = applyTransition('ABORT', state, sm);
+    state.errors.push(msg);
+    writeBothStates(state).catch(() => {});
+  }
+}
+
 process.on('uncaughtException', (err) => {
   console.error('[agent-loop] Uncaught exception:', err);
-  if (currentState.value && currentState.value.currentState === 'run') {
-    currentState.value.currentState = 'done';
-    currentState.value.errors.push(`Uncaught exception: ${err.message}`);
-    writeBothStates(currentState.value).catch(() => {});
-  }
+  markStateError(getCurrentState(), `Uncaught exception: ${err.message}`);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (err) => {
   console.error('[agent-loop] Unhandled rejection:', err);
-  if (currentState.value && currentState.value.currentState === 'run') {
-    currentState.value.currentState = 'done';
-    currentState.value.errors.push(`Unhandled rejection: ${err instanceof Error ? err.message : String(err)}`);
-    writeBothStates(currentState.value).catch(() => {});
-  }
+  markStateError(getCurrentState(), `Unhandled rejection: ${err instanceof Error ? err.message : String(err)}`);
 });
 
 // ── SIGINT handler ─────────────────────────────────────────────────────────
@@ -68,11 +70,7 @@ process.on('SIGINT', () => {
     clearTimeout(timeout);
     const key = answer.trim().toLowerCase();
     if (key === 'y') {
-      if (currentState.value) {
-        currentState.value.currentState = 'done';
-        currentState.value.errors.push('Aborted by user (SIGINT)');
-        writeBothStates(currentState.value).catch(() => {});
-      }
+      markStateError(getCurrentState(), 'Aborted by user (SIGINT)');
       console.log('Exiting...');
       process.exit(1);
     } else {
@@ -171,7 +169,8 @@ async function main(): Promise<void> {
     if (!config.daemon) {
       config.daemon = { intervalMs: 60000, port: 3099 };
     }
-    await runDaemon(config);
+    const daemon = new Daemon(config.daemon.port);
+    await daemon.runIntervalTick(config);
     return;
   }
 

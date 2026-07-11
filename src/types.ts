@@ -13,6 +13,10 @@ export interface PhaseDef {
   healCommand?: string;
   /** Max heal attempts before terminal failure. Defaults to 1 when healCommand set. */
   maxRetries?: number;
+  /** Path to a file this phase MUST produce. Checked after the command exits 0. */
+  produces?: string;
+  /** If true, the produces file must be non-empty. */
+  producedMustHaveContent?: boolean;
 }
 
 export interface Judgment {
@@ -80,6 +84,10 @@ export interface PlanYamlTask {
   llm?: { mcpServer: string; tool: string; prompt: string } | { provider: string; prompt: string };
   healCommand?: string;
   maxRetries?: number;
+  /** Path to a file this task MUST produce. The executor checks existence (and optionally non-empty) after the command exits 0. */
+  produces?: string;
+  /** If true, the produces file must be non-empty (default: false = existence check only). */
+  producedMustHaveContent?: boolean;
 }
 
 export interface PlanYamlDoc {

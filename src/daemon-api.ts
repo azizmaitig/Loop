@@ -11,6 +11,7 @@ import type { TaskQueue } from './task-queue.js';
 import type { TriggerManager } from './triggers.js';
 import type { LoopOrchestrator } from './orchestrator.js';
 import type { StateMdFrontmatter } from './state.js';
+import type { TsRing } from './dashboard-api.js';
 
 /**
  * Narrow interface exposed to HTTP/WS route handlers.
@@ -37,4 +38,5 @@ export interface DaemonAPI {
   readonly startedAt: number;
   readonly server: ReturnType<typeof Bun.serve> | null;
   readonly wsClients: Set<ServerWebSocket<unknown>>;
+  readonly tsRing: TsRing;
 }

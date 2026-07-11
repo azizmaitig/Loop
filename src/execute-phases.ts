@@ -67,6 +67,23 @@ export async function executePhaseGroup(
     const phaseStart = Date.now();
     const result = await executeShellCommand(phase.command, phase.timeoutMs);
 
+    // Produces gate: if phase declared a produces file, verify it exists (and optionally non-empty)
+    if (result.status === 'pass' && phase.produces) {
+      try {
+        const { existsSync, statSync } = await import('node:fs');
+        if (!existsSync(phase.produces)) {
+          result.status = 'fail';
+          result.stderr = `Produces gate: file "${phase.produces}" was not created by phase "${phase.name}"`;
+        } else if (phase.producedMustHaveContent && statSync(phase.produces).size === 0) {
+          result.status = 'fail';
+          result.stderr = `Produces gate: file "${phase.produces}" is empty after phase "${phase.name}"`;
+        }
+      } catch (err) {
+        result.status = 'fail';
+        result.stderr = `Produces gate: error checking artifact "${phase.produces}": ${err instanceof Error ? err.message : String(err)}`;
+      }
+    }
+
     // Plugin hooks: onPhaseEnd or onError
     if (result.status === 'error') {
       const errResults = await executeHooks('onError', { phase, state, error: new Error(result.stderr) }, deps.plugins);

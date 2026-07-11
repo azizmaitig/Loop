@@ -9,6 +9,8 @@ import type { DaemonAPI } from './daemon-api.js';
 import type { LLMConfig, LLMProvider } from './types.js';
 import type { StateMdFrontmatter } from './state.js';
 import { computeTaskMetrics, computeBudgetMetrics, computeTriggerMetrics } from './metrics.js';
+import { handleDashboardApi } from './dashboard-api.js';
+import { join } from 'node:path';
 
 /**
  * Register all HTTP/WS routes on a Bun.serve server config.
@@ -174,6 +176,21 @@ export function createFetchHandler(api: DaemonAPI): (req: Request) => Response |
       return;
     }
 
+    // Serve dashboard static assets — the SPA's index.html uses `./assets/...`
+    // which the browser resolves to `/assets/...` when the page URL has no
+    // trailing slash (/dashboard → resolves to /assets/, not /dashboard/assets/).
+    if ((url.pathname.startsWith('/dashboard/') || url.pathname.startsWith('/assets/')) && req.method === 'GET') {
+      const relativePath = url.pathname.startsWith('/dashboard/')
+        ? url.pathname.slice('/dashboard/'.length)
+        : url.pathname.slice('/'.length);
+      const filePath = join(import.meta.dirname, 'dashboard', relativePath);
+      const file = Bun.file(filePath);
+      const exists = await file.exists();
+      if (exists) {
+        return new Response(file);
+      }
+    }
+
     // GET /dashboard — serve the SPA
     if (url.pathname === '/dashboard' && req.method === 'GET') {
       if (!api.dashboardHtml) {
@@ -255,6 +272,11 @@ export function createFetchHandler(api: DaemonAPI): (req: Request) => Response |
         return Response.json({ error: 'invalid JSON body' }, { status: 400 });
       }
     }
+
+    // Dashboard additive endpoints (design §5). Returns null for non-dashboard
+    // routes, so existing handlers above are untouched.
+    const dash = await handleDashboardApi(api, url, req, api.tsRing);
+    if (dash) return dash;
 
     return new Response('Not found', { status: 404 });
   };

@@ -10,6 +10,7 @@ import type { TaskContext } from './task-processor.js';
 import { readPauseState, writeBothStates, setCurrentState, createInitialState, updateStateMd } from './state.js';
 import type { StateMdFrontmatter } from './state.js';
 import { createFetchHandler } from './routes.js';
+import { createTsRing } from './dashboard-api.js';
 import type { DaemonAPI } from './daemon-api.js';
 import { callLLM } from './llm.js';
 import { saveTaskHistory, readTaskHistory, listTaskHistory } from './history.js';
@@ -34,6 +35,7 @@ export class Daemon {
   readonly triggerManager = new TriggerManager();
   readonly orchestrator: LoopOrchestrator;
   readonly baseDir: string;
+  readonly tsRing = createTsRing(1800);
 
   private _planPath: string | undefined;
   private _cronExpr: string | undefined;
@@ -257,6 +259,7 @@ export class Daemon {
     this._stateInterval = setInterval(() => {
       if (this._status.status !== 'running') return;
       this.broadcast('state_change', { ...this.getState(), children: this.orchestrator.listChildren() });
+      void this.pushTsSample();
     }, 2000);
 
     // Check child status changes every 1s
@@ -291,6 +294,30 @@ export class Daemon {
     const message = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
     for (const ws of this.wsClients) {
       try { ws.send(message); } catch { this.wsClients.delete(ws); }
+    }
+  }
+
+  // Append a live throughput (and queue-depth) sample to the dashboard ring.
+  // Best-effort: failures are non-fatal for the loop itself.
+  private _lastTotal = 0;
+  private _lastTotalTs = 0;
+  private async pushTsSample(): Promise<void> {
+    if (this._status.status !== 'running') return;
+    const now = Date.now();
+    const state = this.getState();
+    try {
+      const { total } = await this.listTaskHistory(1, 1);
+      let throughput = 0;
+      if (this._lastTotalTs > 0) {
+        const dtMin = (now - this._lastTotalTs) / 60_000;
+        if (dtMin > 0) throughput = Math.max(0, (total - this._lastTotal) / dtMin);
+      }
+      this._lastTotal = total;
+      this._lastTotalTs = now;
+      this.tsRing.append({ metric: 'throughput', t: now, v: throughput });
+      this.tsRing.append({ metric: 'queueDepth', t: now, v: state.queueLength });
+    } catch {
+      /* non-fatal */
     }
   }
 
