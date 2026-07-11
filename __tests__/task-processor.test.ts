@@ -71,7 +71,7 @@ describe("executeTask", () => {
 
   test("captures non-zero exit codes", async () => {
     const ctx = fakeCtx();
-    ctx.taskQueue.enqueue("cmd.exe /c exit 42");
+    ctx.taskQueue.enqueue(process.platform === 'win32' ? "cmd.exe /c exit 42" : "exit 42");
     const dequeued = ctx.taskQueue.dequeue()!;
 
     await executeTask(dequeued, ctx);

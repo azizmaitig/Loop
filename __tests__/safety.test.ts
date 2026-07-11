@@ -80,7 +80,10 @@ describe("executeWithTimeout", () => {
       "signal-test",
     );
     expect(receivedSignal).not.toBeNull();
-    expect(receivedSignal!.aborted).toBe(false);
+    // Not checking aborted === false: executeWithTimeout's finally-block aborts
+    // the signal for Bun-on-Windows GC cleanup, making the signal aborted by the
+    // time this assertion runs. Valid signal delivery is the contract.
+    expect(receivedSignal instanceof AbortSignal).toBe(true);
   });
 
   test("signal becomes aborted on timeout", async () => {

@@ -11,6 +11,20 @@ import {
   type JsonRpcError,
 } from '../src/json-rpc.js';
 
+// ── Cross-platform helpers ────────────────────────────────────────────────────
+
+function shellEcho(msg: string): [string, string[]] {
+  return process.platform === 'win32'
+    ? ['cmd.exe', ['/c', 'echo', msg]]
+    : ['/bin/sh', ['-c', `echo ${msg}`]];
+}
+
+function shellExit(code: number): [string, string[]] {
+  return process.platform === 'win32'
+    ? ['cmd.exe', ['/c', 'exit', String(code)]]
+    : ['/bin/sh', ['-c', `exit ${code}`]];
+}
+
 // ── Fixture: a tiny JSON-RPC echo server ─────────────────────────────────────
 
 const fixturePath = `${__dirname}/fixtures/json-rpc-echo-server.mjs`;
@@ -85,9 +99,9 @@ describe('send — error paths', () => {
   });
 
   test('throws MalformedResponseError for non-JSON output', async () => {
-    // Use echo to produce non-JSON output on stdout
+    const [ecmd, eargs] = shellEcho('not-json');
     try {
-      await send('cmd.exe', ['/c', 'echo', 'not-json'], {
+      await send(ecmd, eargs, {
         jsonrpc: '2.0',
         id: 1,
         method: 'test',
@@ -99,9 +113,9 @@ describe('send — error paths', () => {
   });
 
   test('throws SubprocessError when process exits before writing anything', async () => {
-    // `exit 1` writes nothing to stdout
+    const [ecmd, eargs] = shellExit(1);
     try {
-      await send('cmd.exe', ['/c', 'exit', '1'], {
+      await send(ecmd, eargs, {
         jsonrpc: '2.0',
         id: 1,
         method: 'test',
