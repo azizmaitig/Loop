@@ -46,6 +46,7 @@ export interface LoopBodyDeps {
   planPath?: string;
   getPlanDoc?: () => PlanYamlDoc | null;
   logPath?: string;
+  executePhaseGroup?: typeof executePhaseGroup;
 }
 
 export interface LoopBodyResult {
@@ -71,7 +72,8 @@ export async function runLoopBody(deps: LoopBodyDeps): Promise<LoopBodyResult> {
   state = applyTransition('RUN', state, sm);
   await writeState(state);
 
-  const phaseResult = await executePhaseGroup(
+  const runPhases = deps.executePhaseGroup ?? executePhaseGroup;
+  const phaseResult = await runPhases(
     {
       config,
       plugins,
