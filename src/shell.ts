@@ -109,10 +109,15 @@ export async function runCommand(command: string, opts?: RunOptions): Promise<Ru
   const startTime = Date.now();
   const { cmd: args, shell, cleanup } = buildShellArgs(command);
 
-  const execute = async (signal?: AbortSignal): Promise<RunResult> => {
+  const controller = new AbortController();
+  const timeout = opts?.timeoutMs && opts.timeoutMs > 0
+    ? setTimeout(() => controller.abort(), opts.timeoutMs)
+    : undefined;
+
+  try {
     const proc = Bun.spawn(args, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      signal,
+      signal: controller.signal,
       cwd: opts?.cwd,
       shell,
     });
@@ -131,11 +136,7 @@ export async function runCommand(command: string, opts?: RunOptions): Promise<Ru
       stderr: stderr.trim(),
       durationMs: Date.now() - startTime,
     };
-  };
-
-  if (opts?.timeoutMs && opts.timeoutMs > 0) {
-    return executeWithTimeout(execute, opts.timeoutMs, command);
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
-
-  return execute();
 }
