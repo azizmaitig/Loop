@@ -31,3 +31,6 @@ cli.exe
 loop-run-log.md
 .opencode/
 /dashboard/
+
+# loop-factory is a separate project, not part of the agent-loop repo
+loop-factory/

@@ -1,21 +1,17 @@
 import { describe, expect, test, mock } from "bun:test";
 
-// Mock executePhaseGroup so the test exercises ONLY the shared loop body
-// (the RUN → VERIFY → event transition sequence) without spawning real shell
-// commands. The mock simulates successful phase execution by attaching a
-// phaseResult, mirroring what executePhaseGroup does after running phases.
-mock.module("../src/execute-phases.js", () => ({
-  executePhaseGroup: async (_deps: unknown, state: any, _iteration: number) => ({
-    allPassed: true,
-    state: { ...state, phaseResults: { demo: { status: "pass" } } },
-  }),
-}));
-
 const { runLoopBody } = await import("../src/loop-core.js");
 const { StateMachine } = await import("../src/state-machine.js");
 const { createInitialState } = await import("../src/state.js");
 
 import type { LoopState } from "../src/types.js";
+
+function fakeExecutePhaseGroup(_deps: unknown, state: any, _iteration: number) {
+  return Promise.resolve({
+    allPassed: true,
+    state: { ...state, phaseResults: { demo: { status: "pass" } } },
+  });
+}
 
 function makeState(): LoopState {
   return {
@@ -52,6 +48,7 @@ describe("runLoopBody (shared loop core)", () => {
       writeState: async (s) => { writes.push(s); },
       onPhaseFailed,
       decideEvent: () => "LOOP",
+      executePhaseGroup: fakeExecutePhaseGroup,
     });
 
     // 3 state writes: after RUN, after VERIFY, after the decided event.
@@ -77,6 +74,7 @@ describe("runLoopBody (shared loop core)", () => {
       iteration: 3,
       writeState: async (s) => { writes.push(s); },
       decideEvent: () => "COMPLETE",
+      executePhaseGroup: fakeExecutePhaseGroup,
     });
 
     expect(writes.map((s) => s.currentState)).toEqual(["run", "verify", "done"]);
@@ -114,6 +112,7 @@ describe("runLoopBody (shared loop core)", () => {
         iteration: 1,
         writeState: async (s) => { writes.push(s.currentState); },
         decideEvent,
+        executePhaseGroup: fakeExecutePhaseGroup,
       });
 
       expect(writes.slice(0, 2)).toEqual(["run", "verify"]);
@@ -140,6 +139,7 @@ describe("runLoopBody (shared loop core)", () => {
       iteration: 1,
       writeState: async () => {},
       decideEvent,
+      executePhaseGroup: fakeExecutePhaseGroup,
     });
 
     expect(seen).not.toBeNull();

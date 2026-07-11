@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { runCommand } from "../src/shell.js";
 
+const isWin = process.platform === 'win32';
+
+const describeWin = isWin
+  ? describe
+  : describe.skip;
+
 // ── Regression: shell quoting with paths containing spaces ─────────────────────
 //
 // GAP B discovery: buildShellArgs previously wrapped the command in
@@ -24,7 +30,7 @@ function writeProbe(): string {
   return path;
 }
 
-describe("runCommand quoting with paths containing spaces", () => {
+describeWin("runCommand quoting with paths containing spaces", () => {
   test("preserves a quoted arg containing spaces (cmd /c re-parse regression)", async () => {
     const probe = writeProbe();
     try {
