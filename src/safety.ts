@@ -53,15 +53,18 @@ export async function executeWithTimeout<T>(
     timer.unref?.();
   });
 
+  let timedOut = false;
   try {
     return await Promise.race([fn(signal), timeoutPromise]);
+  } catch (err) {
+    timedOut = true;
+    throw err;
   } finally {
     if (timer) clearTimeout(timer);
-    // Abort the controller so the AbortSignal is in a clean terminal state
-    // before GC. Bun on Windows can terminate the parent process if an
-    // AbortSignal that was passed to Bun.spawn is left unresolved when its
-    // controller is garbage collected.
-    controller.abort();
+    // Only abort on timeout (Bun-on-Windows GC workaround).
+    // Leaving the signal unresolved after successful completion prevents
+    // Bun-on-Linux from terminating parent processes that use the signal.
+    if (timedOut) controller.abort();
   }
 }
 
