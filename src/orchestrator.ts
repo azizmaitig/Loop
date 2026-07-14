@@ -26,6 +26,15 @@ const DEFAULT_AVG_COST = 1;
 export class LoopOrchestrator {
   private children = new Map<string, ChildLoopState>();
   private pendingQueue: string[] = [];
+
+  private get runningCount(): number {
+    let count = 0;
+    for (const c of this.children.values()) {
+      if (c.status === 'running') count++;
+    }
+    return count;
+  }
+
   private _maxConcurrentLoops: number;
   private _avgCostPerLoop: number;
   private _getRemainingRuns: () => Promise<number>;
@@ -112,13 +121,7 @@ export class LoopOrchestrator {
 
     const cap = await this.effectiveCap();
 
-    // Count currently running children
-    let runningCount = 0;
-    for (const c of this.children.values()) {
-      if (c.status === 'running') runningCount++;
-    }
-
-    if (runningCount >= cap) {
+    if (this.runningCount >= cap) {
       // At capacity — queue the child
       child.status = 'queued';
       child.error = undefined;
@@ -222,13 +225,7 @@ export class LoopOrchestrator {
 
     const cap = await this.effectiveCap();
 
-    // Count currently running
-    let runningCount = 0;
-    for (const c of this.children.values()) {
-      if (c.status === 'running') runningCount++;
-    }
-
-    const available = cap - runningCount;
+    const available = cap - this.runningCount;
     if (available <= 0) return;
 
     // Sort pending queue by priority descending

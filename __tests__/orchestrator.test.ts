@@ -518,7 +518,7 @@ loops:
   });
 
   describe("LoopOrchestrator — bounded concurrency", () => {
-    test("(a) caps concurrent children at maxConcurrentLoops", async () => {
+    test("caps concurrent children at maxConcurrentLoops", async () => {
       const tq = new TaskQueue();
       const tm = new TriggerManager();
       const orch = new LoopOrchestrator(tq, tm, { maxConcurrentLoops: 2, getRemainingRuns: async () => 100 });
@@ -547,7 +547,7 @@ loops:
       expect(orch.getChildState(id4)!.status).toBe("running");
     });
 
-    test("(b) budget clamp reduces effective cap", async () => {
+    test("budget clamp reduces effective cap", async () => {
       const tq = new TaskQueue();
       const tm = new TriggerManager();
       // remainingRuns=3, maxConcurrentLoops=10, avgCostPerLoop=2 → effectiveCap = floor(3/2) = 1
@@ -569,7 +569,7 @@ loops:
       expect(orch.getChildState(id2)!.status).toBe("queued");
     });
 
-    test("(c) pause+queue when budget exhausted, resumes on recovery", async () => {
+    test("pause+queue when budget exhausted, resumes on recovery", async () => {
       const tq = new TaskQueue();
       const tm = new TriggerManager();
       let remaining = 0;
@@ -601,7 +601,7 @@ loops:
       expect(orch.getChildState(id2)!.status).toBe("running");
     });
 
-    test("(d) priority ordering: higher-priority queued child starts first", async () => {
+    test("priority ordering: higher-priority queued child starts first", async () => {
       const tq = new TaskQueue();
       const tm = new TriggerManager();
       const orch = new LoopOrchestrator(tq, tm, { maxConcurrentLoops: 1 });

@@ -141,6 +141,17 @@ interface SinglePhaseResult {
   state: LoopState;
 }
 
+function makeCancelledResult(durationMs: number): PhaseResult {
+  return {
+    status: 'error',
+    exitCode: -1,
+    stdout: '',
+    stderr: 'cancelled: sibling phase failed',
+    durationMs,
+    evidencePath: '',
+  };
+}
+
 async function runSinglePhase(
   deps: ExecutionDeps,
   state: LoopState,
@@ -150,15 +161,7 @@ async function runSinglePhase(
 ): Promise<SinglePhaseResult> {
   // Check for cancellation from a failed sibling
   if (signal?.aborted) {
-    const cancelledResult: PhaseResult = {
-      status: 'error',
-      exitCode: -1,
-      stdout: '',
-      stderr: 'cancelled: sibling phase failed',
-      durationMs: 0,
-      evidencePath: '',
-    };
-    return { passed: false, state: updatePhaseResult(state, phase.name, cancelledResult) };
+    return { passed: false, state: updatePhaseResult(state, phase.name, makeCancelledResult(0)) };
   }
 
   try { process.stdout.write(`[${iteration}/${deps.config.maxIterations}] ${phase.name}... `); } catch {} // CI without TTY
@@ -175,15 +178,7 @@ async function runSinglePhase(
   // Check for cancellation during command (Bun.spawnSync can't be interrupted mid-flight
   // on Windows, but we check the signal after completion)
   if (signal?.aborted) {
-    const cancelledResult: PhaseResult = {
-      status: 'error',
-      exitCode: -1,
-      stdout: '',
-      stderr: 'cancelled: sibling phase failed',
-      durationMs: Date.now() - phaseStart,
-      evidencePath: '',
-    };
-    return { passed: false, state: updatePhaseResult(state, phase.name, cancelledResult) };
+    return { passed: false, state: updatePhaseResult(state, phase.name, makeCancelledResult(Date.now() - phaseStart)) };
   }
 
   // Produces gate: if phase declared a produces file, verify it exists (and optionally non-empty)
@@ -360,14 +355,7 @@ async function executeShellCommand(
   try {
     const result = await runCommand(command, { timeoutMs });
     if (signal?.aborted) {
-      return {
-        status: 'error',
-        exitCode: -1,
-        stdout: '',
-        stderr: 'cancelled: sibling phase failed',
-        durationMs: Date.now() - startTime,
-        evidencePath: '',
-      };
+      return makeCancelledResult(Date.now() - startTime);
     }
     return {
       status: result.exitCode === 0 ? 'pass' : 'fail',

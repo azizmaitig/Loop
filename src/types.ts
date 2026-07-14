@@ -21,8 +21,6 @@ export interface PhaseDef {
   dependsOn?: string[];
   /** References a composite id for atomic composite expansion. Internal use. */
   use?: string;
-  /** Marker set by plan-executor when expanding an atomic composite. */
-  atomicComposite?: boolean;
 }
 
 export interface Judgment {

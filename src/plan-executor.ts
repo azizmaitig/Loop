@@ -60,8 +60,10 @@ export function expandComposites(
         // Atomic composites get a marker for downstream inspection
       });
     } else {
-      // Expand into sub-phases inline
+      // Expand into sub-phases inline; strip sub-phase dependsOn
+      // since expanded IDs are prefixed and original refs become dangling
       for (const subPhase of composite.phases) {
+        const { dependsOn: _, ...cleanSub } = subPhase;
         expanded.push({
           ...subPhase,
           id: `${task.id}:${subPhase.id}`,
@@ -110,7 +112,6 @@ function mapTasksToPhases(tasks: PlanYamlTask[]): PhaseDef[] {
     producedMustHaveContent: task.producedMustHaveContent,
     dependsOn: task.dependsOn,
     use: task.use,
-    atomicComposite: task.use != null,
     llm: task.llm
       ? 'provider' in task.llm
         ? { provider: task.llm.provider ?? 'openai', prompt: task.llm.prompt ?? '' }
