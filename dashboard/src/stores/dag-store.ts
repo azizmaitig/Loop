@@ -470,11 +470,14 @@ export const useDagStore = create<DagStore>((set, get) => ({
       timestamp: checkpoint.updatedAt,
     });
 
-    // Store and process all events
+    // Store and process all events in one atomic update
+    const { nodeMap, edgeMap } = applyEvents(events);
     set({
       selectedPlanName: planName,
       replayEvents: events,
       scrubPos: -1,
+      dagNodes: [...nodeMap.values()],
+      dagEdges: [...edgeMap.values()],
     });
 
     return events;

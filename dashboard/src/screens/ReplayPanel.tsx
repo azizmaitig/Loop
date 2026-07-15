@@ -63,11 +63,8 @@ export function ReplayPanel() {
       enterReplayMode();
       selectReplayPlan(cp.planName);
 
-      // Generate synthetic events and load into store
+      // Generate synthetic events and compute DAG in one atomic store update
       loadCheckpoint(cp);
-
-      // Show all events initially
-      setScrubPos(-1);
 
       setLoading(false);
     } catch (err) {
