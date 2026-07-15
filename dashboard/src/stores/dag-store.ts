@@ -159,6 +159,21 @@ function applyEvents(
         }
         break;
       }
+      case 'task_failed': {
+        const d = ev.data as TaskFailedData;
+        const taskKey = d.taskId ?? (d as { id?: string }).id;
+        const id = `task-${taskKey}`;
+        const existing = nodeMap.get(id);
+        if (existing) {
+          nodeMap.set(id, {
+            ...existing,
+            status: 'failed',
+            error: d.error,
+            completedAt: ev.timestamp,
+          });
+        }
+        break;
+      }
       case 'iteration_start': {
         const d = ev.data as IterationData;
         const id = loopNodeId(d.planName, d.iteration);
