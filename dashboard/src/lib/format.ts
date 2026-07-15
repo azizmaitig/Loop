@@ -2,10 +2,17 @@
 
 export function formatDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || Number.isNaN(ms)) return '—';
+  if (ms < 0) return '—';
   if (ms < 1000) return `${Math.round(ms)}ms`;
   const s = ms / 1000;
   if (s < 60) return `${s.toFixed(1)}s`;
   const m = Math.floor(s / 60);
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    const remS = Math.round(s % 60);
+    return `${h}h ${remM}m ${remS}s`;
+  }
   const rem = Math.round(s % 60);
   return `${m}m ${rem}s`;
 }
@@ -22,9 +29,9 @@ export function formatNumber(n: number | null | undefined): string {
 
 export function formatTime(iso: string | number | null | undefined): string {
   if (iso === null || iso === undefined) return '—';
-  const d = typeof iso === 'number' ? new Date(iso) : new Date(iso);
+  const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString();
+  return d.toLocaleString();
 }
 
 export function formatUptime(seconds: number | null | undefined): string {
