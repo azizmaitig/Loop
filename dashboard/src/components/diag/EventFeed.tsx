@@ -10,6 +10,13 @@ const ALL_TYPES: StreamEventType[] = [
   'child_status_change',
   'task_event',
   'task_completed',
+  'phase_start',
+  'phase_complete',
+  'task_started',
+  'task_failed',
+  'fsm_transition',
+  'iteration_start',
+  'iteration_complete',
 ];
 
 const TYPE_COLOR: Record<string, string> = {
@@ -17,6 +24,13 @@ const TYPE_COLOR: Record<string, string> = {
   child_status_change: 'var(--pass)',
   task_event: 'var(--warn)',
   task_completed: 'var(--ok)',
+  phase_start: 'var(--accent)',
+  phase_complete: 'var(--ok)',
+  task_started: 'var(--warn)',
+  task_failed: 'var(--crit)',
+  fsm_transition: 'var(--pass)',
+  iteration_start: 'var(--accent)',
+  iteration_complete: 'var(--ok)',
 };
 
 const ROW_HEIGHT = 26;
