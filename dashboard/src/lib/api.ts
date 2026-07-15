@@ -63,6 +63,8 @@ export interface ApiFetchOptions {
   method?: string;
   /** Request body string (e.g. JSON.stringify'd). Sets Content-Type: application/json when present. */
   body?: string;
+  /** AbortSignal for cancellation (forwarded from TanStack Query callers). */
+  signal?: AbortSignal;
 }
 
 export async function apiFetch<T>(
@@ -89,6 +91,7 @@ export async function apiFetch<T>(
       method: opts.method ?? 'GET',
       headers,
       body: opts.body,
+      signal: opts.signal,
     });
   } catch (err) {
     throw new ApiError(0, `network error: ${String(err)}`, url.toString());
@@ -116,68 +119,79 @@ export async function apiFetch<T>(
 
 // ── Endpoint helpers (one per backend route) ──────────────────────────────
 
-export function fetchDaemonState(): Promise<DaemonState> {
-  return apiFetch<DaemonState>('/state');
+export function fetchDaemonState(signal?: AbortSignal): Promise<DaemonState> {
+  return apiFetch<DaemonState>('/state', { signal });
 }
 
 export function fetchMetrics(
   window: string,
   lastN: number,
+  signal?: AbortSignal,
 ): Promise<MetricsResponse> {
   return apiFetch<MetricsResponse>('/api/metrics', {
     params: { window, lastN },
+    signal,
   });
 }
 
 export function fetchHistory(
   page: number,
   pageSize: number,
+  signal?: AbortSignal,
 ): Promise<HistoryListResponse> {
   return apiFetch<HistoryListResponse>('/api/history', {
     params: { page, pageSize },
+    signal,
   });
 }
 
-export function fetchTask(id: string): Promise<HistoryEntry> {
-  return apiFetch<HistoryEntry>(`/api/tasks/${encodeURIComponent(id)}`);
+export function fetchTask(id: string, signal?: AbortSignal): Promise<HistoryEntry> {
+  return apiFetch<HistoryEntry>(`/api/tasks/${encodeURIComponent(id)}`, { signal });
 }
 
-export function fetchLoops(): Promise<ChildLoopSummary[]> {
-  return apiFetch<ChildLoopSummary[]>('/loops');
+export function fetchLoops(signal?: AbortSignal): Promise<ChildLoopSummary[]> {
+  return apiFetch<ChildLoopSummary[]>('/loops', { signal });
 }
 
 export function fetchHealthScore(
   window: string,
   lastN: number,
+  signal?: AbortSignal,
 ): Promise<HealthScore | null> {
   return apiFetch<HealthScore | null>('/api/health-score', {
     allowNotFound: true,
     params: { window, lastN },
+    signal,
   });
 }
 
 export function fetchTimeSeries(
   metric: string,
   window: string,
+  signal?: AbortSignal,
 ): Promise<TimeSeriesResponse | null> {
   return apiFetch<TimeSeriesResponse | null>('/api/metrics/timeseries', {
     allowNotFound: true,
     params: { metric, window },
+    signal,
   });
 }
 
 export function fetchCheckpoint(
   planPath?: string,
+  signal?: AbortSignal,
 ): Promise<CheckpointState | null> {
   return apiFetch<CheckpointState | null>('/api/checkpoint', {
     allowNotFound: true,
     params: planPath ? { planPath } : undefined,
+    signal,
   });
 }
 
-export function fetchCheckpoints(): Promise<CheckpointsResponse | null> {
+export function fetchCheckpoints(signal?: AbortSignal): Promise<CheckpointsResponse | null> {
   return apiFetch<CheckpointsResponse | null>('/api/checkpoints', {
     allowNotFound: true,
+    signal,
   });
 }
 
@@ -185,16 +199,18 @@ export interface PauseResponse {
   paused: boolean;
 }
 
-export function fetchPause(): Promise<PauseResponse> {
+export function fetchPause(signal?: AbortSignal): Promise<PauseResponse> {
   return apiFetch<PauseResponse>('/api/pause', {
     params: { [CACHE_BUST]: Date.now() },
+    signal,
   });
 }
 
 /** POST to /api/pause to set the daemon paused state. */
-export function setPause(paused: boolean): Promise<PauseResponse> {
+export function setPause(paused: boolean, signal?: AbortSignal): Promise<PauseResponse> {
   return apiFetch<PauseResponse>('/api/pause', {
     method: 'POST',
     body: JSON.stringify({ paused }),
+    signal,
   });
 }
