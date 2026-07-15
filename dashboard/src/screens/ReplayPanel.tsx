@@ -79,7 +79,7 @@ export function ReplayPanel() {
   // ── Fetch checkpoint list ───────────────────────────────────────────────
   const { data: checkpointsData, isPending: cpPending } = useQuery({
     queryKey: ['checkpoints'],
-    queryFn: fetchCheckpoints,
+    queryFn: ({ signal }) => fetchCheckpoints(signal),
     refetchInterval: 10_000,
   });
 
