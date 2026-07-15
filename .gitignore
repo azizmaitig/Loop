@@ -21,6 +21,9 @@ test_*.json
 
 # Build artifacts, caches, and project noise
 GARBAGE/
+
+# Dashboard build output (regenerated from dashboard/ via bun run build)
+src/dashboard/
 .omo/evidence/
 .omo/run-continuation/
 .omo/notepads/
