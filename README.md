@@ -242,7 +242,7 @@ The `LOOP` edge (`verify → init`) is the explicit loop *within* one run. Inspe
 | Memory | `agentmemory.ts`, `memory-hooks.ts` |
 | Daemon | `daemon.ts`, `daemon-api.ts`, `routes.ts`, `dashboard-api.ts`, `task-processor.ts`, `task-queue.ts`, `triggers.ts`, `history.ts`, `run-log.ts`, `metrics.ts` |
 | Orchestration | `orchestrator.ts`, `worktree.ts`, `collision.ts`, `budget.ts` |
-| Recovery | `recovery.ts`, `_prototype-feedback-controller.ts` (v9) |
+| Recovery | `recovery.ts`, `prototypes/_prototype-feedback-controller.ts` (v9) |
 | Plugins | `maker-checker-plugin.ts` |
 | Init | `init.ts` |
 
@@ -284,7 +284,7 @@ agent-loop/
 ```bash
 bun test                       # full suite — 438 tests across 33 files
 bun test __tests__/task-processor.test.ts   # a single file
-bun run src/_prototype-feedback-controller.ts  # v9 feedback-controller prototype
+bun run prototypes/_prototype-feedback-controller.ts  # v9 feedback-controller prototype
 ```
 
 No `build` / `compile`: Bun runs `.ts` on the fly. Don't add a transpile step.

@@ -99,11 +99,7 @@
 
 - **CONTEXT.md** (321 lines): Comprehensive architecture document covering: design decisions, module-by-module breakdown, data flow (14-step sequence), state machine, configuration reference, v7/v8 improvements, plugin system, test strategy, quick start, and glossary with 7 defined terms.
 
-- **LOOP.md** (33 lines): Active loop configuration with table of patterns, human gates, worktree instructions, MCP connectors, budget rules.
-
-- **loop-constraints.md** (31 lines): Binding rules for push/merge, paths, code, communication, budget.
-
-- **loop-budget.md** (26 lines): Daily limits with explicit max runs/tokens/sub-agent spawns.
+- *(Consolidated into `AGENTS.md` — see Safety/guardrails section for constraints, Budget section for limits, Active loop configuration for loops.)*
 
 - **PLAN-WRITING-GUIDE.md** (284 lines): Detailed plan authoring reference with mental model, schema, field reference, LLM contract, guardrails, two plan archetypes (6A/6B), anti-pattern table (13 items), and pre-flight checklist (11 items).
 
@@ -293,7 +289,7 @@
 
 - **Fresh subprocess per phase**: Each phase in plan YAMLs runs as a separate `opencode run` subprocess, not as a continuation of the previous LLM session.
 
-- **Worktree history**: `.omo/worktrees/dashboard-loop-state/` shows an existing worktree with its own `STATE.md`, `loop-constraints.md`, `loop-budget.md`, ADRs, and plans — indicating worktrees carry full project context.
+- **Worktree history**: `.omo/worktrees/dashboard-loop-state/` shows an existing worktree with its own `STATE.md`, AGENTS.md (containing constraints and budget), ADRs, and plans — indicating worktrees carry full project context.
 
 ### ❌ What is NOT implemented
 
@@ -422,4 +418,4 @@ Each technique was scored against a 4-point scale:
 | **2** | Present but basic — core implementation works but lacks production polish or depth |
 | **3** | Production-grade — fully wired, tested, documented, and integrated into the workflow |
 
-Evidence was collected by reading all source files under `src/`, all ADRs under `docs/adr/`, all plan YAML files (representative sample), all SKILL.md files, all configuration files (package.json, opencode.json, .gitignore), and all markdown documentation (AGENTS.md, CONTEXT.md, LOOP.md, STATE.md, PLAN-WRITING-GUIDE.md, loop-constraints.md, loop-budget.md). No runtime execution or test runs were performed.
+Evidence was collected by reading all source files under `src/`, all ADRs under `docs/adr/`, all plan YAML files (representative sample), all SKILL.md files, all configuration files (package.json, opencode.json, .gitignore), and all markdown documentation (AGENTS.md, CONTEXT.md, STATE.md, PLAN-WRITING-GUIDE.md, docs/agentic-driven-loop.md). No runtime execution or test runs were performed.

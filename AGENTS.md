@@ -146,8 +146,8 @@ All agents working in this repo MUST follow these rules. They are non-negotiable
 ## Dashboard SPA
 
 - **Source** lives in `dashboard/` (Vite + React TypeScript SPA).
-- **Build output** goes to `src/dashboard/` (`vite.config.ts: outDir: '../src/dashboard'`).
-- The daemon serves the dashboard from `src/dashboard/` at `/dashboard#/`.
-- **Do NOT edit files in `src/dashboard/` directly** — they are build artifacts and will be overwritten.
+- **Build output** goes to `public/dashboard/` (`vite.config.ts: outDir: '../public/dashboard'`).
+- The daemon serves the dashboard from `public/dashboard/` at `/dashboard#/`.
+- **Do NOT edit files in `public/dashboard/` directly** — they are build artifacts and will be overwritten.
 - After changing `dashboard/src/`, rebuild with: `cd dashboard && bun run build`.
 - Tests: `cd dashboard && bun test`.
