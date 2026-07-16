@@ -174,7 +174,7 @@ export function createFetchHandler(api: DaemonAPI): (req: Request) => Response |
       if (!upgraded) {
         return new Response('WebSocket upgrade failed', { status: 400 });
       }
-      return;
+      return new Response(null, { status: 101 });
     }
 
     // Serve dashboard static assets — the SPA's index.html uses `./assets/...`

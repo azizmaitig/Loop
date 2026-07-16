@@ -53,6 +53,6 @@ export function parseFrontmatter<T = Record<string, unknown>>(content: string): 
  * Serialize data to YAML frontmatter wrapped in --- markers.
  */
 export function dumpFrontmatter(fm: Record<string, unknown>): string {
-  const body = yaml.dump(fm, { indent: 2, lineWidth: 120, quotingType: '"', forceQuotes: false }).trimEnd();
+  const body = yaml.dump(fm, { indent: 2, lineWidth: 120, quoteStyle: 'double', forceQuotes: false }).trimEnd();
   return `---\n${body}\n---`;
 }

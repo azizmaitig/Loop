@@ -225,7 +225,7 @@ export type TriggerDef =
 
 export interface ChildLoopDef {
   name: string;
-  planPath: string;
+  planPath?: string;
   triggers?: TriggerDef[];
   /** Shorthand: creates a fileWatch trigger for this directory */
   watchDir?: string;
@@ -236,7 +236,7 @@ export interface ChildLoopState {
   id: string;
   name: string;
   status: ChildLoopStatus;
-  planPath: string;
+  planPath?: string;
   triggers: TriggerDef[];
   enabled: boolean;
   createdAt: string;
@@ -249,7 +249,7 @@ export interface ChildLoopSummary {
   id: string;
   name: string;
   status: ChildLoopStatus;
-  planPath: string;
+  planPath?: string;
   triggerCount: number;
   enabled: boolean;
 }

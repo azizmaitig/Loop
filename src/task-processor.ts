@@ -52,6 +52,7 @@ export async function executeTask(task: Task, ctx: TaskContext): Promise<void> {
       const llmInfo = task.llm as { prompt: string; system?: string; mcpServer?: string; tool?: string };
       const response = await ctx.callLLM(config, llmInfo.prompt, llmInfo.system);
       taskQueue.complete(task.id, {
+        status: 'pass',
         exitCode: 0,
         stdout: response,
         stderr: '',
@@ -109,7 +110,7 @@ export async function executeTask(task: Task, ctx: TaskContext): Promise<void> {
       durationMs = result.durationMs;
     }
 
-    taskQueue.complete(task.id, { exitCode, stdout, stderr, durationMs });
+    taskQueue.complete(task.id, { status: 'pass', exitCode, stdout, stderr, durationMs });
     broadcast('task_completed', taskQueue.get(task.id));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -29,9 +29,9 @@ interface BufferedStreamEvent {
 
 export class Daemon {
   private _status: DaemonStatus;
-  private server: ReturnType<typeof Bun.serve> | null = null;
-  private dashboardHtml = '';
-  private wsClients = new Set<ServerWebSocket<unknown>>();
+  server: ReturnType<typeof Bun.serve> | null = null;
+  dashboardHtml = '';
+  wsClients = new Set<ServerWebSocket<unknown>>();
   private eventBuffer: BufferedStreamEvent[] = [];
   private readonly EVENT_BUFFER_MAX = 500;
   private _stateInterval: ReturnType<typeof setInterval> | null = null;
@@ -39,7 +39,7 @@ export class Daemon {
   private _loopState: LoopState | null = null;
   private _loopStateInterval: ReturnType<typeof setInterval> | null = null;
   private _loopStateDir: string;
-  private startedAt: number = 0;
+  startedAt: number = 0;
   private stopResolve: (() => void) | null = null;
   private processing = false;
   private _loopsConfigPath: string | undefined;
@@ -324,14 +324,14 @@ export class Daemon {
     }
   }
 
-  private isAuthorized(req: Request): boolean {
+  isAuthorized(req: Request): boolean {
     const apiKey = process.env.LOOP_API_KEY;
     if (!apiKey) return true; // No key configured = open access
     const auth = req.headers.get('Authorization');
     return auth === `Bearer ${apiKey}`;
   }
 
-  private async isPaused(): Promise<boolean> {
+  async isPaused(): Promise<boolean> {
     return readPauseState(resolve(this.baseDir, 'STATE.md'));
   }
 
@@ -356,7 +356,7 @@ export class Daemon {
     }
   }
 
-  private maybeProcessQueue(): void {
+  maybeProcessQueue(): void {
     this.processQueue().catch(() => {});
   }
 }
