@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Daemon } from "../src/daemon.js";
+import { LoopMetricsTracker } from "../src/metrics.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ describe("GET /api/metrics", () => {
       // Seed 2 failed tasks
       seedTask(tempDir, "task-006", "failed", { completedAt: now });
       seedTask(tempDir, "task-007", "failed", { completedAt: now });
-      // Seed 1 cancelled task → counts as error
+      // Seed 1 cancelled task → counted as cancel (not error)
       seedTask(tempDir, "task-008", "cancelled", { completedAt: now });
 
       // Seed loop-run-log.md for budget
@@ -72,7 +73,9 @@ describe("GET /api/metrics", () => {
 
         expect(tm.passCount).toBe(5);
         expect(tm.failCount).toBe(2);
-        expect(tm.errorCount).toBe(1);
+        expect(tm.errorCount).toBe(0);
+        expect(tm.cancelCount).toBe(1);
+        expect(tm.abortCount).toBe(0);
 
         expect(tm.avgDurationMs).toBe(300);
         expect(tm.p50DurationMs).toBe(300);
@@ -157,6 +160,44 @@ describe("GET /api/metrics", () => {
     } finally {
       d.stop();
       await startPromise;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── LoopMetricsTracker durability ─────────────────────────────────────────────
+
+describe("LoopMetricsTracker persistence", () => {
+  test("counters survive daemon restart (disk round-trip)", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "metrics-durability-"));
+
+    try {
+      // Instance 1: record some state, then persist
+      const tracker1 = new LoopMetricsTracker();
+      tracker1.setStoragePath(tempDir);
+
+      tracker1.recordFsmTransition({ planName: "plan-a", event: "LOOP" });
+      tracker1.recordFsmTransition({ planName: "plan-a", event: "LOOP" });
+      tracker1.recordFsmTransition({ planName: "plan-a", event: "LOOP" });
+      // A complete run of 8 iterations
+      tracker1.recordIterationStart({ planName: "plan-a", iteration: 1 });
+      tracker1.recordIterationStart({ planName: "plan-a", iteration: 8 });
+      tracker1.recordFsmTransition({ planName: "plan-a", event: "COMPLETE" });
+
+      const result1 = tracker1.compute();
+      expect(result1.totalLoopBacks).toBe(3);
+      expect(result1.avgIterationsPerRun).toBe(8);
+      expect(result1.maxIterationsPerRun).toBe(8);
+
+      // Instance 2: fresh tracker, same dir — should reload from disk
+      const tracker2 = new LoopMetricsTracker();
+      tracker2.setStoragePath(tempDir);
+
+      const result2 = tracker2.compute();
+      expect(result2.totalLoopBacks).toBe(3);
+      expect(result2.avgIterationsPerRun).toBe(8);
+      expect(result2.maxIterationsPerRun).toBe(8);
+    } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
   });

@@ -1,5 +1,22 @@
 export type StateMachineState = 'init' | 'run' | 'verify' | 'done';
 
+export interface ValidatorDef {
+  /** Rubric the phase output is graded against by an LLM. */
+  criteria: string;
+  /** Re-run the phase command on validation failure (Conductor caps at 1). Default 1. */
+  maxRetries?: number;
+  /** Optional LLM override; defaults to env-based config (LLM_PROVIDER/LLM_API_KEY/LLM_MODEL). */
+  llm?: { provider: string; prompt?: string };
+}
+
+export interface ValidationResult {
+  passed: boolean;
+  reason: string;
+  confidence: number;
+  /** Number of re-run attempts before finalizing. */
+  retriesUsed: number;
+}
+
 export interface PhaseDef {
   name: string;
   command: string;
@@ -21,6 +38,8 @@ export interface PhaseDef {
   dependsOn?: string[];
   /** References a composite id for atomic composite expansion. Internal use. */
   use?: string;
+  /** Optional LLM validator gate (Conductor-style). Runs after command succeeds. */
+  validator?: ValidatorDef;
 }
 
 export interface Judgment {
@@ -59,8 +78,14 @@ export interface ExecutionResult {
 
 export interface PhaseResult extends ExecutionResult {
   evidencePath: string;
+  /** Path to the full stdout offload file, set when stdout exceeds the inline tail cap. */
+  stdoutPath?: string;
+  /** Path to the full stderr offload file, set when stderr exceeds the inline tail cap. */
+  stderrPath?: string;
   judgment?: Judgment;
   pluginResults?: Record<string, any>;
+  /** Advisory validation result from the LLM validator gate. Never hard-fails. */
+  validation?: ValidationResult;
 }
 
 export interface LoopState {
@@ -96,6 +121,8 @@ export interface PlanYamlTask {
   dependsOn?: string[];
   /** References a composite id declared in the top-level composites block. */
   use?: string;
+  /** Optional LLM validator gate (Conductor-style). Runs after command succeeds. */
+  validator?: ValidatorDef;
 }
 
 /** A reusable composite phase sequence defined in a plan YAML. */
@@ -198,7 +225,7 @@ export type TriggerDef =
 
 export interface ChildLoopDef {
   name: string;
-  planPath: string;
+  planPath?: string;
   triggers?: TriggerDef[];
   /** Shorthand: creates a fileWatch trigger for this directory */
   watchDir?: string;
@@ -209,7 +236,7 @@ export interface ChildLoopState {
   id: string;
   name: string;
   status: ChildLoopStatus;
-  planPath: string;
+  planPath?: string;
   triggers: TriggerDef[];
   enabled: boolean;
   createdAt: string;
@@ -222,7 +249,7 @@ export interface ChildLoopSummary {
   id: string;
   name: string;
   status: ChildLoopStatus;
-  planPath: string;
+  planPath?: string;
   triggerCount: number;
   enabled: boolean;
 }

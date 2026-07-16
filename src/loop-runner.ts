@@ -15,8 +15,10 @@ import { executeBeforeLoop, executeAfterLoop } from './plugins.js';
 import type { Plugin } from './plugins.js';
 import { getPlanDoc } from './plan-executor.js';
 import { saveCheckpoint, clearCheckpoint, loadCheckpoint, hasValidCheckpoint } from './checkpoint.js';
+import { cleanupRunOutput } from './output-store.js';
 import { evaluatePhase } from './evaluate.js';
 import { runLoopBody } from './loop-core.js';
+import type { StateMachine } from './state-machine.js';
 import { onPhaseFailed, onLoopComplete } from './memory-hooks.js';
 import { writeBothStates, setCurrentState } from './state.js';
 import { applyTransition } from './transition.js';
@@ -125,15 +127,37 @@ function resolveHardcoded(allPassed: boolean, iteration: number, maxIterations: 
   return 'FAILED';
 }
 
+export interface RunLoopOpts {
+  /** Optional broadcast callback for live WS events. */
+  broadcast?: (type: string, data: unknown) => void;
+  /** Optional abort signal for early termination. */
+  signal?: AbortSignal;
+  /** When true, skip the interactive checkpoint resume prompt (daemon mode). */
+  skipCheckpointPrompt?: boolean;
+}
+
 // ── Main loop runner ────────────────────────────────────────────────────────
 
-async function runLoop(config: LoopConfig): Promise<number> {
+async function runLoop(config: LoopConfig, broadcast?: RunLoopOpts['broadcast']): Promise<number>;
+async function runLoop(config: LoopConfig, opts?: RunLoopOpts): Promise<number>;
+async function runLoop(config: LoopConfig, broadcastOrOpts?: RunLoopOpts['broadcast'] | RunLoopOpts): Promise<number> {
+  // Normalise overloaded second argument
+  let broadcast: RunLoopOpts['broadcast'];
+  let signal: RunLoopOpts['signal'];
+  let skipCheckpointPrompt: RunLoopOpts['skipCheckpointPrompt'];
+  if (broadcastOrOpts && typeof broadcastOrOpts === 'object') {
+    broadcast = broadcastOrOpts.broadcast;
+    signal = broadcastOrOpts.signal;
+    skipCheckpointPrompt = broadcastOrOpts.skipCheckpointPrompt;
+  } else {
+    broadcast = broadcastOrOpts;
+  }
   const { sm, state: loopCtxState, plugins } = await createLoopContext(config);
   let state = loopCtxState;
 
-  // ── Checkpoint resume prompt ──
+  // ── Checkpoint resume prompt (skipped in daemon mode) ──
   let resume = false;
-  if (config.planPath) {
+  if (config.planPath && !skipCheckpointPrompt) {
     try {
       const { parsePlanYaml } = await import('./plan-executor.js')
       const doc = await parsePlanYaml(config.planPath)
@@ -181,6 +205,10 @@ async function runLoop(config: LoopConfig): Promise<number> {
   let allPassed = true;
 
   for (let i = 0; i < config.maxIterations; i++) {
+    if (signal?.aborted) {
+      console.log(`\nLoop ABORTED via signal — ${i} iteration(s) completed`);
+      break;
+    }
     try {
       const result = await runLoopBody({
         sm,
@@ -193,6 +221,7 @@ async function runLoop(config: LoopConfig): Promise<number> {
         planPath: config.planPath,
         getPlanDoc,
         logPath: resolve('loop-run-log.md'),
+        broadcast,
         // resolveTransition honors maxIterations + pass/fail (0-based index i).
         decideEvent: (passed, postVerifyState) => resolveTransition(sm, config, postVerifyState, i, passed),
       });
@@ -237,12 +266,13 @@ async function runLoop(config: LoopConfig): Promise<number> {
     };
     await executeAfterLoop(planPlugin, loopResult);
 
-    // ── Clear checkpoint on full success ──
+    // ── Clear checkpoint + output offload on full success ──
     if (allPassed && config.planPath) {
       const planDoc = getPlanDoc()
       if (planDoc) {
         clearCheckpoint(planDoc.planName)
-        console.log(`[checkpoint] Plan completed — checkpoint cleared.`)
+        cleanupRunOutput(planDoc.planName)
+        console.log(`[checkpoint] Plan completed — checkpoint and phase output files cleared.`)
       }
     }
   }

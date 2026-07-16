@@ -114,8 +114,12 @@ async function buildTransport(
  * Serialise a JSON‑RPC request and write it to the subprocess stdin.
  */
 async function writeRequest(proc: Subprocess, request: JsonRpcRequest): Promise<void> {
-  proc.stdin.write(JSON.stringify(request));
-  proc.stdin.end();
+  const stdin = proc.stdin;
+  if (!stdin || typeof stdin === 'number') {
+    throw new SpawnError('json-rpc: stdin not available for request');
+  }
+  stdin.write(JSON.stringify(request));
+  stdin.end();
 }
 
 /**
@@ -128,10 +132,20 @@ async function readResponse(
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   let stdout = '';
   let stderr = '';
+  const outStream = proc.stdout;
+  const errStream = proc.stderr;
+  if (
+    !outStream ||
+    typeof outStream === 'number' ||
+    !errStream ||
+    typeof errStream === 'number'
+  ) {
+    throw new SpawnError('json-rpc: stdout/stderr not available for response');
+  }
   try {
     [stdout, stderr] = await Promise.all([
-      Bun.readableStreamToText(proc.stdout),
-      Bun.readableStreamToText(proc.stderr),
+      Bun.readableStreamToText(outStream),
+      Bun.readableStreamToText(errStream),
     ]);
   } catch {
     // Stream read may fail after process is killed by abort signal

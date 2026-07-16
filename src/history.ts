@@ -74,14 +74,15 @@ export async function listTaskHistory(
   for (const taskId of pageIds) {
     const entry = await readTaskHistory(baseDir, taskId);
     if (entry) {
+      const task = entry.task;
       tasks.push({
-        id: entry.task.id,
-        command: entry.task.command,
-        status: (entry.task as { status?: string }).status ?? entry.task.lifecycle,
-        createdAt: entry.task.createdAt,
-        completedAt: entry.task.completedAt,
-        durationMs: entry.task.durationMs ?? entry.task.result?.durationMs,
-        exitCode: entry.task.exitCode ?? entry.task.result?.exitCode,
+        id: task.id,
+        command: task.command,
+        status: task.lifecycle,
+        createdAt: task.createdAt,
+        completedAt: task.completedAt,
+        durationMs: task.result?.durationMs,
+        exitCode: task.result?.exitCode,
       });
     }
   }

@@ -12,6 +12,7 @@ import type { TriggerManager } from './triggers.js';
 import type { LoopOrchestrator } from './orchestrator.js';
 import type { StateMdFrontmatter } from './state.js';
 import type { TsRing } from './dashboard-api.js';
+import type { LoopMetricsResult } from './metrics.js';
 
 /**
  * Narrow interface exposed to HTTP/WS route handlers.
@@ -30,6 +31,8 @@ export interface DaemonAPI {
   listTaskHistory(page?: number, pageSize?: number): Promise<HistoryListResponse>;
   updateStateMd(fm: StateMdFrontmatter): Promise<void>;
   isSafeCommand(command: string): boolean;
+  /** Return live loop-metrics tracked from the daemon's event stream. */
+  getLoopMetrics(): LoopMetricsResult;
   readonly taskQueue: TaskQueue;
   readonly orchestrator: LoopOrchestrator;
   readonly triggerManager: TriggerManager;

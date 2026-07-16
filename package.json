@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "prototype:feedback": "bun run src/_prototype-feedback-controller.ts"
+    "typecheck": "tsc --noEmit",
+    "prototype:feedback": "bun run prototypes/_prototype-feedback-controller.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.1.0",
     "typescript": "^6.0.3"
   },
