@@ -18,4 +18,5 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install
       - run: bun run typecheck
+      - run: cd dashboard && bun install && bun run build
       - run: bun test

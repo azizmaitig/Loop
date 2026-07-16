@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
@@ -42,6 +42,9 @@ function sendRequest(method: string, params: Record<string, unknown> = {}): Prom
 }
 
 describe('agent-loop-mcp', () => {
+  // Conditionally skip MCP tests when the server isn't available (CI, non-Windows)
+  const mcpIt = hasMcpServer ? test : test.skip;
+
   beforeAll(() => {
     if (!hasMcpServer) return;
     child = spawn(isWin ? 'npx.cmd' : 'npx', ['-y', 'tsx', 'src/index.ts'], {
@@ -55,8 +58,7 @@ describe('agent-loop-mcp', () => {
     child?.kill();
   });
 
-  it('should expose all 8 tools', async () => {
-    if (!hasMcpServer) return;
+  mcpIt('should expose all 8 tools', async () => {
     const result = await sendRequest('tools/list') as { tools: { name: string }[] };
     expect(result.tools).toBeDefined();
     const names = result.tools.map(t => t.name).sort();
@@ -72,8 +74,7 @@ describe('agent-loop-mcp', () => {
     ]);
   });
 
-  it('get_status should return daemon state', async () => {
-    if (!hasMcpServer) return;
+  mcpIt('get_status should return daemon state', async () => {
     const result = await sendRequest('tools/call', {
       name: 'get_status',
       arguments: {},
@@ -85,8 +86,7 @@ describe('agent-loop-mcp', () => {
     expect(state).toHaveProperty('queueLength');
   });
 
-  it('enqueue_task should reject empty command', async () => {
-    if (!hasMcpServer) return;
+  mcpIt('enqueue_task should reject empty command', async () => {
     const result = await sendRequest('tools/call', {
       name: 'enqueue_task',
       arguments: { command: '' },
@@ -95,8 +95,7 @@ describe('agent-loop-mcp', () => {
     expect(text).toContain('error');
   });
 
-  it('list_loops should return array', async () => {
-    if (!hasMcpServer) return;
+  mcpIt('list_loops should return array', async () => {
     const result = await sendRequest('tools/call', {
       name: 'list_loops',
       arguments: {},
