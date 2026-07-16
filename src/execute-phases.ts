@@ -318,7 +318,7 @@ async function runSinglePhase(
     planName,
     iteration,
     phaseName: phase.name,
-    status: result.status,
+    outcome: result.status,
     durationMs: totalPhaseMs,
     exitCode: result.exitCode,
     error: result.status !== 'pass' ? result.stderr || undefined : undefined,
