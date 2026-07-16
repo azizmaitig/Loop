@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { DagNodeData } from '../../lib/types';
+import { formatDuration } from '../../lib/format';
 
 const STATUS_COLOR: Record<string, string> = {
   running: 'var(--warn)',
@@ -91,11 +92,9 @@ function DagNode({ data, selected }: NodeProps) {
           </div>
         )}
 
-        {d.durationMs != null && (
-          <div className="dag-node-meta">
-            {d.durationMs < 1000
-              ? `${Math.round(d.durationMs)}ms`
-              : `${(d.durationMs / 1000).toFixed(1)}s`}
+        {d.status === 'completed' && d.durationMs != null && (
+          <div className="dag-node-meta" style={{ color: 'var(--ok)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+            {formatDuration(d.durationMs)}
           </div>
         )}
       </div>

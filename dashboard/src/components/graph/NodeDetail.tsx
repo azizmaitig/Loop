@@ -60,6 +60,14 @@ export function NodeDetail({ node, onClose, emptyMessage }: {
             <code className="snippet">{node.command}</code>
           </div>
         )}
+        {node.durationMs != null && (
+          <div className="dag-detail-field">
+            <span className="dag-detail-label">Duration</span>
+            <span className="muted" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontVariantNumeric: 'tabular-nums' }}>
+              {formatDuration(node.durationMs)}
+            </span>
+          </div>
+        )}
         {node.input && (
           <div className="dag-detail-field">
             <span className="dag-detail-label">Input</span>
@@ -89,12 +97,6 @@ export function NodeDetail({ node, onClose, emptyMessage }: {
             <div className="dag-detail-field">
               <span className="dag-detail-label">Completed</span>
               <span className="muted">{formatTime(node.completedAt)}</span>
-            </div>
-          )}
-          {node.durationMs != null && (
-            <div className="dag-detail-field">
-              <span className="dag-detail-label">Duration</span>
-              <span className="muted">{formatDuration(node.durationMs)}</span>
             </div>
           )}
         </div>

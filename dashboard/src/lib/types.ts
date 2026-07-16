@@ -83,6 +83,8 @@ export interface TaskMetricsResult {
   passCount: number;
   failCount: number;
   errorCount: number;
+  abortCount: number;
+  cancelCount: number;
   avgDurationMs: number | null;
   p50DurationMs: number | null;
   p95DurationMs: number | null;
@@ -105,10 +107,17 @@ export interface TriggerSummary {
   running: boolean;
 }
 
+export interface LoopMetricsResult {
+  totalLoopBacks: number;
+  avgIterationsPerRun: number;
+  maxIterationsPerRun: number;
+}
+
 export interface MetricsResponse {
   taskMetrics: TaskMetricsResult;
   budget: BudgetMetricsResult;
   triggers: TriggerSummary[];
+  loopMetrics?: LoopMetricsResult;
 }
 
 export interface HistoryEntryPhase {

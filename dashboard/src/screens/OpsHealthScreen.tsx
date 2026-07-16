@@ -1,3 +1,4 @@
+import { AlertChips } from '../components/ops/AlertChips';
 import { HealthScoreCard } from '../components/ops/HealthScoreCard';
 import { MetricCardGrid } from '../components/ops/MetricCardGrid';
 import { LiveTimeSeriesStrip } from '../components/ops/LiveTimeSeriesStrip';
@@ -9,6 +10,7 @@ export function OpsHealthScreen() {
   return (
     <div className="stack">
       <BudgetBanner />
+      <AlertChips />
       <div className="grid grid-2">
         <HealthScoreCard />
         <MetricCardGrid />

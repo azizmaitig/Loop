@@ -17,6 +17,8 @@ import { callLLM } from './llm.js';
 import { saveTaskHistory, readTaskHistory, listTaskHistory } from './history.js';
 import { isSafeCommand } from './shell.js';
 import { OUTPUT_DIR, VERSION } from './constants.js';
+import { LoopMetricsTracker } from './metrics.js';
+import type { LoopMetricsResult } from './metrics.js';
 
 /** Buffered stream event envelope — matches the live WS payload shape exactly so replays are identical. */
 interface BufferedStreamEvent {
@@ -50,6 +52,7 @@ export class Daemon {
   private _planPath: string | undefined;
   private _cronExpr: string | undefined;
   private _planConfig: LoopConfig | undefined;
+  readonly loopTracker = new LoopMetricsTracker();
 
   constructor(
     private _port: number = 3000,
@@ -73,6 +76,9 @@ export class Daemon {
       port: _port,
     };
     this.baseDir = baseDir ?? resolve('.');
+
+    // Load persisted loop-metrics from disk so counters survive daemon restarts.
+    this.loopTracker.setStoragePath(resolve(this.baseDir, OUTPUT_DIR));
 
     // Loop ↔ daemon path contract: must match OUTPUT_DIR (src/constants.ts) exactly
     // so we read the same STATE.md the phase loop writes. Resolve in the body, not
@@ -144,6 +150,10 @@ export class Daemon {
 
   isSafeCommand(command: string): boolean {
     return isSafeCommand(command);
+  }
+
+  getLoopMetrics(): LoopMetricsResult {
+    return this.loopTracker.compute();
   }
 
   async start(): Promise<void> {
@@ -278,6 +288,15 @@ export class Daemon {
     const message = JSON.stringify(event);
     for (const ws of this.wsClients) {
       try { ws.send(message); } catch { this.wsClients.delete(ws); }
+    }
+
+    // Track loop-back events from the FSM for live metrics.
+    // fsm_transition data: { type, ts, planName, iteration, from, to, event }
+    // iteration_start   data: { type, ts, planName, iteration }
+    if (type === 'fsm_transition' && data && typeof data === 'object') {
+      this.loopTracker.recordFsmTransition(data as Record<string, unknown>);
+    } else if (type === 'iteration_start' && data && typeof data === 'object') {
+      this.loopTracker.recordIterationStart(data as Record<string, unknown>);
     }
   }
 

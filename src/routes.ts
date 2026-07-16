@@ -209,7 +209,8 @@ export function createFetchHandler(api: DaemonAPI): (req: Request) => Response |
       const taskMetrics = await computeTaskMetrics(api.baseDir, lastN, window);
       const budget = await computeBudgetMetrics(api.baseDir);
       const triggers = computeTriggerMetrics(api.triggerManager.list());
-      return Response.json({ taskMetrics, budget, triggers });
+      const loopMetrics = api.getLoopMetrics();
+      return Response.json({ taskMetrics, budget, triggers, loopMetrics });
     }
 
     // POST /api/llm — call an LLM provider directly

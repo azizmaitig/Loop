@@ -15,13 +15,14 @@ export const PassFailErrorDonut = memo(function PassFailErrorDonut() {
     );
   }
 
-  const { passCount, failCount, errorCount } = data.taskMetrics;
+  const { passCount, failCount, errorCount, abortCount, cancelCount } = data.taskMetrics;
   const total = passCount + failCount + errorCount;
   const pieData = [
     { name: 'pass', value: passCount, color: 'var(--pass)' },
     { name: 'fail', value: failCount, color: 'var(--fail)' },
     { name: 'error', value: errorCount, color: 'var(--error)' },
   ];
+  const hasAbortOrCancel = abortCount > 0 || cancelCount > 0;
 
   return (
     <Card title="Pass / Fail / Error">
@@ -45,6 +46,12 @@ export const PassFailErrorDonut = memo(function PassFailErrorDonut() {
             <span style={{ color: 'var(--fail)' }}>fail {formatNumber(failCount)}</span>
             <span style={{ color: 'var(--error)' }}>error {formatNumber(errorCount)}</span>
           </div>
+          {hasAbortOrCancel && (
+            <div className="row" style={{ gap: 12, justifyContent: 'center', fontSize: 11, marginTop: 4 }}>
+              <span style={{ color: 'var(--text-dim)' }}>aborted {formatNumber(abortCount)}</span>
+              <span style={{ color: 'var(--text-dim)' }}>cancelled {formatNumber(cancelCount)}</span>
+            </div>
+          )}
         </>
       )}
     </Card>
