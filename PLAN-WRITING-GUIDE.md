@@ -83,7 +83,94 @@ hand (except `dependsOn` — see §4A) — the executor owns the rest.
 
 ---
 
-## 4A. Parallel phases via `dependsOn` (Feature A)
+## 3A. Daemon runtime & plan-level config
+
+Your plan runs inside a daemon. How the daemon runs — which port, how fast, how often —
+is controlled by **two layers**:
+
+1. **CLI flags** when you start the daemon (`bun run loop.ts daemon ...`)
+2. **`daemon:` block** at the top of your plan YAML
+
+### 3A.1 CLI flags (how you start it)
+
+```powershell
+bun run loop.ts daemon --port 3000 --plan "plans/my-plan.yaml"
+```
+
+| Flag | What it does | Required? | Default |
+|------|-------------|-----------|---------|
+| `--port <number>` | Serves the dashboard Web UI on this port | no | `3000` |
+| `--plan "path/to.yaml"` | Load phases from this YAML file | no (uses built-in demo) | — |
+| `--cron "* * * * *"` | Re-trigger the plan on a cron schedule (every minute, every hour, etc.) | no | — |
+
+**`--plan` without `--cron`:** The daemon still runs your plan continuously — it executes
+phases, then loops back and runs them again. The warning `--plan provided without --cron`
+is misleading; your plan runs fine. See §3A.2 for the gap between iterations.
+
+**`--plan` with `--cron`:** Adds a **separate** timer that re-enqueues the whole plan on
+the cron schedule. Use this when you want a fixed time between runs (e.g. `0 9 * * *` =
+once daily at 9am). Without it, the daemon runs the plan back-to-back in its own tick loop.
+
+**`--cron` without `--plan`:** Does nothing useful — cron triggers an empty queue.
+
+### 3A.2 The gap between iterations (and how to remove it)
+
+When you run `--plan` without `--cron`, this is what happens internally:
+
+```
+[tick] run all 4 phases (takes ~5s) → wait 60s → [tick] run all 4 phases → wait 60s → ...
+```
+
+The 60-second wait comes from `daemon.intervalMs` which defaults to **60000ms**. If your
+phases finish fast, you sit idle most of the time.
+
+**To run back-to-back with no meaningful gap, add a `daemon:` block to your plan YAML:**
+
+```yaml
+planName: my-plan
+daemon:
+  intervalMs: 1000      # 1 second gap instead of 60 — phases restart almost immediately
+tasks:
+  - id: read-state
+    command: type STATE.md
+    timeoutMs: 5000
+  ...
+```
+
+Set `intervalMs: 0` for zero delay. The daemon will execute phases, loop, and execute
+again as fast as the phases themselves take.
+
+### 3A.3 The `daemon:` block (plan-level config)
+
+All daemon tuning lives under a top-level `daemon:` key at the start of your plan YAML.
+It goes **before** `tasks:`.
+
+```yaml
+planName: calendar-continuous
+daemon:
+  intervalMs: 1000   # ms between tick iterations (default 60000)
+tasks:
+  ...
+```
+
+| Field | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `daemon.intervalMs` | no | `60000` | Milliseconds between daemon tick iterations. Lower = tighter loop. `0` = no delay. |
+
+### 3A.4 Quick comparison — three ways to run
+
+| Command | Dashboard? | Plan runs? | Gap between iterations |
+|---------|-----------|-----------|----------------------|
+| `bun run loop.ts daemon --port 3000 --plan "plans/x.yaml"` | ✅ port 3000 | ✅ continuously | 60s (set `daemon.intervalMs` to shrink it) |
+| `bun run loop.ts daemon --port 3000 --plan "plans/x.yaml" --cron "* * * * *"` | ✅ port 3000 | ✅ on cron schedule | (cron-driven, ignores intervalMs) |
+| `bun run loop.ts start --plan "plans/x.yaml" --max-iterations Infinity` | ❌ (terminal only) | ✅ continuously | **0** — immediate loop-back, no wait |
+| `bun run loop.ts start --plan "plans/x.yaml"` | ❌ (terminal only) | ✅ once, then exits | — |
+
+**The `start` mode** runs the plan in your terminal with no dashboard. Useful for testing
+or when you don't need the live UI. `--max-iterations Infinity` makes it run forever
+until Ctrl+C.
+
+---
 
 When a task declares `dependsOn:`, the executor builds a dependency DAG at runtime.
 Phases whose dependencies are all satisfied run **concurrently** in the same layer.
