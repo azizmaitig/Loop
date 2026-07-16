@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { useQuery } from '@tanstack/react-query';
+import { SkipBack, Play, Pause, SkipForward } from 'lucide-react';
 import { fetchCheckpoints, fetchCheckpoint } from '../lib/api';
 import { useDagStore } from '../stores/dag-store';
 import { WorkflowGraph } from '../components/graph/WorkflowGraph';
@@ -205,7 +206,7 @@ export function ReplayPanel() {
             </div>
           ) : checkpoints.length === 0 ? (
             <div className="dag-empty">
-              <div className="dag-empty-icon">📋</div>
+              <div className="dag-empty-icon" style={{ fontSize: 22 }}>⊞</div>
               <h3>No checkpoints found</h3>
               <p className="muted">
                 No checkpoint files were found on the server. Run a plan to generate checkpoints.
@@ -303,15 +304,15 @@ export function ReplayPanel() {
                   title="Step backward"
                   disabled={scrubPos <= -1}
                 >
-                  ⏮
+                  <SkipBack size={14} strokeWidth={1.5} />
                 </button>
                 <button
                   className="pagebtn"
                   onClick={handlePlayPause}
                   title={isPlaying ? 'Pause' : 'Play'}
-                  style={{ minWidth: 40 }}
+                  style={{ minWidth: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  {isPlaying ? '⏸' : '▶'}
+                  {isPlaying ? <Pause size={14} strokeWidth={1.5} /> : <Play size={14} strokeWidth={1.5} />}
                 </button>
                 <button
                   className="pagebtn"
@@ -319,7 +320,7 @@ export function ReplayPanel() {
                   title="Step forward"
                   disabled={scrubPos >= replayEvents.length - 1}
                 >
-                  ⏭
+                  <SkipForward size={14} strokeWidth={1.5} />
                 </button>
               </div>
 
@@ -399,13 +400,10 @@ function CheckpointCard({
 }) {
   return (
     <button
-      className="card"
+      className="card checkpoint-card"
       onClick={onSelect}
       disabled={loading}
       style={{
-        cursor: 'pointer',
-        textAlign: 'left',
-        width: '100%',
         border: selected ? '1px solid var(--accent)' : undefined,
         opacity: loading ? 0.6 : 1,
         display: 'flex',
