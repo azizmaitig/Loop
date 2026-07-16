@@ -78,6 +78,10 @@ export interface ExecutionResult {
 
 export interface PhaseResult extends ExecutionResult {
   evidencePath: string;
+  /** Path to the full stdout offload file, set when stdout exceeds the inline tail cap. */
+  stdoutPath?: string;
+  /** Path to the full stderr offload file, set when stderr exceeds the inline tail cap. */
+  stderrPath?: string;
   judgment?: Judgment;
   pluginResults?: Record<string, any>;
   /** Advisory validation result from the LLM validator gate. Never hard-fails. */

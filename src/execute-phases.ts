@@ -28,6 +28,7 @@ import { appendRunLog } from './run-log.js';
 import type { RunLogEntry } from './run-log.js';
 import { topoSortLayers } from './phase-graph.js';
 import { makeEvent } from './events.js';
+import { applyOutputBounds } from './output-store.js';
 
 /** Everything executePhaseGroup needs from the caller's context. */
 export interface ExecutionDeps {
@@ -251,6 +252,10 @@ async function runSinglePhase(
   }));
 
   let result = await executeShellCommand(phase.command, phase.timeoutMs, signal);
+
+  // Apply output bounds — tail-cap stdout/stderr in memory, offload large output to disk
+  const runName = deps.getPlanDoc?.()?.planName ?? deps.config.taskName;
+  result = { ...result, ...applyOutputBounds(phase.name, iteration, runName, result) };
 
   // Check for cancellation during command (Bun.spawnSync can't be interrupted mid-flight
   // on Windows, but we check the signal after completion)

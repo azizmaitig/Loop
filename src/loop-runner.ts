@@ -15,6 +15,7 @@ import { executeBeforeLoop, executeAfterLoop } from './plugins.js';
 import type { Plugin } from './plugins.js';
 import { getPlanDoc } from './plan-executor.js';
 import { saveCheckpoint, clearCheckpoint, loadCheckpoint, hasValidCheckpoint } from './checkpoint.js';
+import { cleanupRunOutput } from './output-store.js';
 import { evaluatePhase } from './evaluate.js';
 import { runLoopBody } from './loop-core.js';
 import type { StateMachine } from './state-machine.js';
@@ -265,12 +266,13 @@ async function runLoop(config: LoopConfig, broadcastOrOpts?: RunLoopOpts['broadc
     };
     await executeAfterLoop(planPlugin, loopResult);
 
-    // ── Clear checkpoint on full success ──
+    // ── Clear checkpoint + output offload on full success ──
     if (allPassed && config.planPath) {
       const planDoc = getPlanDoc()
       if (planDoc) {
         clearCheckpoint(planDoc.planName)
-        console.log(`[checkpoint] Plan completed — checkpoint cleared.`)
+        cleanupRunOutput(planDoc.planName)
+        console.log(`[checkpoint] Plan completed — checkpoint and phase output files cleared.`)
       }
     }
   }
