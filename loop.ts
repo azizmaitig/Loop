@@ -139,6 +139,33 @@ async function main(): Promise<void> {
     return;
   }
 
+  // ── Validate mode — structural schema check of a .plan.yaml ─────────────
+  if (parsed.subcommand === 'validate') {
+    if (!parsed.planPath) {
+      console.error('Error: validate requires --plan <path>');
+      process.exit(1);
+    }
+    const { parsePlanYaml } = await import('./src/plan-executor.js');
+    const { validatePlanSchema } = await import('./src/plan-schema.js');
+    let doc;
+    try {
+      doc = await parsePlanYaml(parsed.planPath);
+    } catch (err) {
+      console.error(`Invalid plan: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+    const errors = validatePlanSchema(doc);
+    if (errors.length === 0) {
+      console.log(`OK: ${parsed.planPath} passes the structural schema.`);
+      process.exit(0);
+    }
+    console.error(`Schema errors in ${parsed.planPath}:`);
+    for (const e of errors) {
+      console.error(`  - [${e.rule}] ${e.detail}`);
+    }
+    process.exit(1);
+  }
+
   if (parsed.subcommand !== 'start') {
     printHelp();
     process.exit(1);

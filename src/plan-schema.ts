@@ -1,0 +1,123 @@
+/**
+ * plan-schema.ts — structural schema validator for .plan.yaml files.
+ *
+ * This is the FIELD-CONTRACT layer. It catches shape/value errors that the
+ * executor does NOT check at load time but which cause silent no-op runs
+ * or misleading defaults:
+ *
+ *   - empty / missing `command`        (executor runs nothing, phase "passes")
+ *   - duplicate task `id`s            (breaks resume + checkpoint keys)
+ *   - `llm.provider` outside the allowed set (executor silently defaults to 'openai')
+ *   - `validator` block without `criteria` (guide: required-if-present)
+ *   - `llm` in MCP form (`mcpServer`+`tool`) with a missing `tool` (defaults to '')
+ *
+ * It deliberately does NOT duplicate what is already enforced elsewhere:
+ *   - `constitution.ts`      → read-state-first, verify-last, denylisted paths, non-empty
+ *   - `phase-graph.ts`       → dangling `dependsOn` + cycles (throws at DAG build)
+ *   - `expandComposites`     → unknown `use` ref (throws at load)
+ *
+ * Run it standalone via `bun run loop.ts validate --plan <path>`, or import
+ * `validatePlanSchema` to gate plan load the same way `checkPlanAgainstConstitution`
+ * does.
+ */
+
+import type { PlanYamlDoc, PlanYamlTask } from './types.js';
+
+/** Providers the executor actually recognizes (src/types.ts: LLMProvider). */
+const KNOWN_LLM_PROVIDERS = new Set(['openai', 'anthropic', 'opencode']);
+
+export interface PlanSchemaError {
+  rule: string;
+  detail: string;
+}
+
+/**
+ * Validate a parsed plan's structural contract.
+ * Returns an empty array when the plan is structurally sound.
+ */
+export function validatePlanSchema(doc: PlanYamlDoc): PlanSchemaError[] {
+  const errors: PlanSchemaError[] = [];
+  const tasks = doc.tasks ?? [];
+
+  const seenIds = new Map<string, number>();
+  tasks.forEach((task, idx) => {
+    seenIds.set(task.id, (seenIds.get(task.id) ?? 0) + 1);
+    validateTask(task, idx, errors);
+  });
+
+  // Duplicate id check (breaks resume/checkpoint keying).
+  for (const [id, count] of seenIds) {
+    if (count > 1) {
+      errors.push({
+        rule: 'duplicate-id',
+        detail: `Task id "${id}" is used ${count} times; ids must be unique.`,
+      });
+    }
+  }
+
+  // Composites: validate their sub-phases too (they share the same field rules).
+  if (doc.composites) {
+    for (const composite of doc.composites) {
+      composite.phases?.forEach((phase, idx) => {
+        validateTask(phase, idx, errors, `Composite "${composite.id}"`);
+      });
+    }
+  }
+
+  return errors;
+}
+
+function validateTask(
+  task: PlanYamlTask,
+  idx: number,
+  errors: PlanSchemaError[],
+  label = 'Task',
+): void {
+  const where = `${label} "${task.id ?? `#${idx}`}"`;
+
+  // Rule: command must be a non-empty string. The executor maps command -> name
+  // and runs it verbatim; an empty command produces no work and "passes".
+  if (task.command === undefined || task.command === null || task.command.trim() === '') {
+    errors.push({
+      rule: 'empty-command',
+      detail: `${where} has an empty or missing command. Every task must run a real shell command (even LLM tasks — the command produces the stdout the LLM judges).`,
+    });
+  }
+
+  // Rule: llm block, if present, must be well-formed.
+  if (task.llm) {
+    if ('provider' in task.llm) {
+      const provider = task.llm.provider;
+      if (!provider || !KNOWN_LLM_PROVIDERS.has(provider)) {
+        errors.push({
+          rule: 'unknown-llm-provider',
+          detail: `${where} llm.provider "${provider ?? ''}" is not one of openai | anthropic | opencode. The executor would silently default to 'openai'.`,
+        });
+      }
+      if (!task.llm.prompt || task.llm.prompt.trim() === '') {
+        errors.push({
+          rule: 'missing-llm-prompt',
+          detail: `${where} has an llm block but no prompt. The prompt must instruct the model to return {passed, reason, confidence}.`,
+        });
+      }
+    } else {
+      // MCP form: requires both mcpServer and tool.
+      if (!task.llm.tool || task.llm.tool.trim() === '') {
+        errors.push({
+          rule: 'missing-llm-tool',
+          detail: `${where} uses the MCP form of llm (mcpServer+tool) but omits tool. The executor would default tool to '' and the call would no-op.`,
+        });
+      }
+    }
+  }
+
+  // Rule: validator block, if present, requires criteria.
+  if (task.validator) {
+    if (!task.validator.criteria || task.validator.criteria.trim() === '') {
+      errors.push({
+        rule: 'validator-without-criteria',
+        detail: `${where} has a validator block but no criteria. The validator grades output against this rubric; without it the gate is meaningless.`,
+      });
+    }
+  }
+}

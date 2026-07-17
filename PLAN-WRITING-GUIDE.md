@@ -9,6 +9,43 @@ rules below was violated. Read this before writing or editing any plan under `pl
 
 ---
 
+## 0. Machine-enforced contract (run this before saving)
+
+This guide is prose, but the rules are **checkable**. A dedicated structural
+validator enforces the field contract that the executor does *not* check at load
+time. Run it on any plan before committing:
+
+```powershell
+bun run loop.ts validate --plan "plans/my-plan.yaml"
+```
+
+- Exit `0` → plan passes the structural schema.
+- Exit `1` → one or more schema errors printed as `- [<rule>] <detail>`.
+
+The validator (`src/plan-schema.ts`, `validatePlanSchema`) catches:
+
+| Rule | What it catches |
+|------|-----------------|
+| `empty-command` | A task with no `command` (or whitespace only). The executor runs nothing and the phase "passes" — the #1 silent no-op. |
+| `duplicate-id` | Two tasks share an `id`; breaks resume + checkpoint keying. |
+| `unknown-llm-provider` | `llm.provider` isn't `openai` / `anthropic` / `opencode`; executor would silently default to `openai`. |
+| `missing-llm-prompt` | An `llm` block with no `prompt` (must request `{passed, reason, confidence}`). |
+| `missing-llm-tool` | MCP-form `llm` (`mcpServer`+`tool`) with no `tool`; defaults to `''` and no-ops. |
+| `validator-without-criteria` | A `validator` block with no `criteria` rubric. |
+
+It deliberately **does not** duplicate the other gates (run in addition to it):
+
+- `constitution.ts` (`checkPlanAgainstConstitution`) — already runs at plan load and
+  enforces `read-state-first`, `verify-last`, denylisted paths, non-empty tasks.
+- `phase-graph.ts` (`topoSortLayers`) — throws on dangling `dependsOn` / cycles at DAG build.
+- `expandComposites` — throws on an unknown `use` reference at plan load.
+
+**Treat `validate` as the pre-flight.** A plan that passes both `validate` and the
+constitution gate is structurally guaranteed to run; only *behavioral* quality
+(the LLM prompts, the artifacts, the worktree paths) remains a human review item.
+
+---
+
 ## 1. Mental model (how your YAML is executed)
 
 `src/plan-executor.ts` reads your YAML once (`beforeLoop`) and turns **each task into a
@@ -79,7 +116,7 @@ That is the entire contract. `planName` + a list of tasks, each with a unique `i
 | `tasks[].validator.llm` | no | (env) | Optional LLM override for the validator. Same shape as `tasks[].llm`. Defaults to `LLM_PROVIDER`/`LLM_API_KEY`/`LLM_MODEL` env vars. |
 
 Do **not** author `status`, `durationMs`, `completedAt`, `confidence`, or `dependsOn` by
-hand (except `dependsOn` — see §4A) — the executor owns the rest.
+hand (except `dependsOn` — see §3A) — the executor owns the rest.
 
 ---
 
@@ -121,41 +158,33 @@ When you run `--plan` without `--cron`, this is what happens internally:
 [tick] run all 4 phases (takes ~5s) → wait 60s → [tick] run all 4 phases → wait 60s → ...
 ```
 
-The 60-second wait comes from `daemon.intervalMs` which defaults to **60000ms**. If your
-phases finish fast, you sit idle most of the time.
+The 60-second wait comes from `daemon.intervalMs` which defaults to **60000ms** in the
+daemon config. If your phases finish fast, you sit idle most of the time.
 
-**To run back-to-back with no meaningful gap, add a `daemon:` block to your plan YAML:**
+**To tighten the gap, pass the interval at startup — the interval lives in the daemon
+config, NOT in the plan YAML:**
 
-```yaml
-planName: my-plan
-daemon:
-  intervalMs: 1000      # 1 second gap instead of 60 — phases restart almost immediately
-tasks:
-  - id: read-state
-    command: type STATE.md
-    timeoutMs: 5000
-  ...
+```powershell
+# tighter loop: interval comes from the daemon config, not the plan
+bun run loop.ts daemon --port 3000 --plan "plans/my-plan.yaml" --daemon
 ```
 
-Set `intervalMs: 0` for zero delay. The daemon will execute phases, loop, and execute
-again as fast as the phases themselves take.
+The loop will then execute phases, loop, and execute again as fast as the phases
+themselves take. Set `intervalMs: 0` in the daemon config for zero delay.
 
-### 3A.3 The `daemon:` block (plan-level config)
+### 3A.3 The `daemon:` block is NOT parsed from the plan
 
-All daemon tuning lives under a top-level `daemon:` key at the start of your plan YAML.
-It goes **before** `tasks:`.
+> **Note:** `daemon.intervalMs` is **not** a field the executor reads from
+> your plan YAML. `PlanYamlDoc` (src/types.ts) has no `daemon` key. The loop
+> interval comes from the CLI/`--daemon` flag or the in-process config
+> (`LoopConfig.daemon.intervalMs`), not from the `.plan.yaml`. Do **not** add a
+> `daemon:` block to a plan expecting the executor to honor it — it is silently
+> ignored.
 
-```yaml
-planName: calendar-continuous
-daemon:
-  intervalMs: 1000   # ms between tick iterations (default 60000)
-tasks:
-  ...
-```
-
-| Field | Required | Default | Notes |
-|-------|----------|---------|-------|
-| `daemon.intervalMs` | no | `60000` | Milliseconds between daemon tick iterations. Lower = tighter loop. `0` = no delay. |
+If you genuinely need per-plan interval control, that requires a code change to
+`plan-executor.ts`/`LoopConfig` (add `daemon` to `PlanYamlDoc` and merge it in
+`beforeLoop`) — file an issue; it is intentionally out of scope for plan authors
+today.
 
 ### 3A.4 Quick comparison — three ways to run
 
@@ -203,7 +232,7 @@ the sibling is aborted via `AbortController` and the layer fails immediately.
 - Phases with `dependsOn: []` (explicitly empty) are treated as having no
   dependencies and can group with other independent phases in layer 0.
 
-## 4B. Reusable composite sequences (Feature B)
+## 4. Reusable composite sequences (Feature B)
 
 Plan YAML can define reusable phase sequences under a top-level `composites:` block.
 A task references a composite via `use:`.
@@ -282,7 +311,7 @@ tasks:
 
 ---
 
-## 5. Guardrails every plan MUST respect
+## 6. Guardrails every plan MUST respect
 
 These come from `AGENTS.md`. A plan that violates them is a
 "wrong plan" even if it executes.
@@ -321,7 +350,7 @@ These come from `AGENTS.md`. A plan that violates them is a
   "Le fichier spécifié est introuvable" even though the script itself runs fine.
   (This is a PowerShell/.NET gotcha, not an agent-loop bug.)
 
-### 5.1 Worktree path alignment (if a code phase creates a worktree)
+### 6.1 Worktree path alignment (if a code phase creates a worktree)
 
 When a code phase runs `git -C <vault> worktree add <dir> <branch>`, the worktree lands at
 `<target>-build` (a **sibling** of `<target>`), not inside `<target>`. The plan's `command`
@@ -339,11 +368,11 @@ phases point at it.
 
 ---
 
-## 6. Two plan archetypes
+## 7. Two plan archetypes
 
 The loop supports two styles. Pick the right one for your goal.
 
-### 6A. Audit / maintenance — pure shell (no LLM)
+### 7A. Audit / maintenance — pure shell (no LLM)
 
 Use for scans, reports, data processing, cron jobs. All phases run `powershell.exe` or other
 shell commands. Fast, deterministic, no LLM cost.
@@ -377,7 +406,7 @@ tasks:
     timeoutMs: 120000
 ```
 
-### 6B. Build / create — LLM-powered via `opencode run` (RECOMMENDED for apps)
+### 7B. Build / create — LLM-powered via `opencode run` (RECOMMENDED for apps)
 
 Use when you need an agent to **plan, design, write code, or review**. Each phase delegates
 the generative work to `opencode run`, which spawns a sub-agent with its own model. The
@@ -385,11 +414,11 @@ output flows through `.build/` files so each phase starts from fresh context (no
 
 The canonical template lives at `.omo/plans/build-app-pipeline.yaml`. Pattern:
 
-### 6B.0 Resolve agents & skills from your vault — do NOT hardcode
+### 7B.0 Resolve agents & skills from your vault — do NOT hardcode
 
 The #1 failure mode in 6B plans is baking in a specific `--agent` name (e.g.
 `code-reviewer`) that doesn't match your current vault, or that can't do what the
-phase asks (see §7 #14). **Agents and skills are discovered at plan-authoring
+phase asks (see §8 #14). **Agents and skills are discovered at plan-authoring
 time from your vault, not recalled from memory.** Before writing a 6B plan:
 
 1. **Enumerate what's actually available.** Run `opencode agent list` to see the
@@ -513,7 +542,7 @@ tasks:
 
 **Agent specialization (`--agent` flag):**
 Use `--agent <name>` to route a phase to a specialized persona. **Resolve `<name>` from
-`opencode agent list` at authoring time — do not copy a name from an old plan** (see §6B.0).
+`opencode agent list` at authoring time — do not copy a name from an old plan** (see §7B.0).
 
 | Phase | `--agent` | Write? | Why / caveat |
 |---|---|---|---|
@@ -542,14 +571,15 @@ each persona's tool list for a file-write capability before assigning an artifac
 
 | # | Failure | Symptom | Prevention |
 |---|---|---|---|
-| 1 | **Silent no-op** | Code phase exits 0 but produces no files. Tests pass on old code. | Add `produces:` with the expected diff/artifact path (absolute, see §6B.0). The executor fails the phase if the file is missing. |
+| 1 | **Silent no-op** | Code phase exits 0 but produces no files. Tests pass on old code. | Add `produces:` with the expected diff/artifact path (absolute, see §7B.0). The executor fails the phase if the file is missing. |
 | 2 | **Disconnected critique** | Design-critique finds problems; code phase never reads the critique and ships the same bugs. | Every code prompt must include: "Also read {critique-file} — it tells you what to avoid." |
 | 3 | **Phantom fields** | Architect invents field names that don't exist in the real source types (`totalTasks`, `triggers[]`, `stderr`). | Before the design phase, inject real source files as input: "Read src/types.ts before writing any field names. Do not invent fields that don't exist in these types." |
 | 4 | **Self-grading** | The agent that builds decides "done." No independent gate catches an empty or wrong result. | Use `produces:` as a deterministic check + a separate verify phase that runs the real build/test (not `opencode run` wrapping the build). |
-| 5 | **Agent write restriction** | A read-only persona (e.g. `code-reviewer`) is told to "write X.md"; it only prints to stdout, so the file never appears and `produces:` FAILs — but the phase is already wasted. | For read-only personas, **redirect stdout to the artifact** (`> .build/x.md`) so the shell — not the agent — creates the file. Or use the default agent for write phases. See §6B.0 / §7 #14. |
-| 6 | **Subprocess death not detected** | The inner `opencode run` child exited, but the bun parent (running the executor) blocked forever with no timeout firing; the wait never resolved. | Set `timeoutMs` strictly above the inner LLM's max execution time, and ensure the executor has its own subprocess timeout. A hung child must not be able to wedge the loop (see §6B.1). |
-| 7 | **Worktree path ≠ `--dir` path** | The code phase creates a git worktree at `<target>-build` (sibling), but downstream phases still `--dir <target>` and find nothing. | If a code phase creates a worktree, the worktree path becomes the effective `--dir` for ALL downstream phases. Update every subsequent `--dir` to the worktree (see §5.1). |
-| 8 | **Intermediate `produces`-fail doesn't halt** | design-critique FAILs but the loop proceeds to `code` blind, depending on a file that doesn't exist. | Decide halt-vs-continue policy explicitly (see §5 + checklist #18). A failed artifact gate should stop the run or re-run the upstream phase, not silently continue down a broken dependency chain. |
+| 5 | **Agent write restriction** | A read-only persona (e.g. `code-reviewer`) is told to "write X.md"; it only prints to stdout, so the file never appears and `produces:` FAILs — but the phase is already wasted. | For read-only personas, **redirect stdout to the artifact** (`> .build/x.md`) so the shell — not the agent — creates the file. Or use the default agent for write phases. See §7B.0 / §8 #14. |
+| 6 | **Subprocess death not detected** | The inner `opencode run` child exited, but the bun parent (running the executor) blocked forever with no timeout firing; the wait never resolved. | Set `timeoutMs` strictly above the inner LLM's max execution time, and ensure the executor has its own subprocess timeout. A hung child must not be able to wedge the loop (see §7B.1). |
+| 7 | **Worktree path ≠ `--dir` path** | The code phase creates a git worktree at `<target>-build` (sibling), but downstream phases still `--dir <target>` and find nothing. | If a code phase creates a worktree, the worktree path becomes the effective `--dir` for ALL downstream phases. Update every subsequent `--dir` to the worktree (see §6.1). |
+| 8 | **Intermediate `produces`-fail doesn't halt** | design-critique FAILs but the loop proceeds to `code` blind, depending on a file that doesn't exist. | Decide halt-vs-continue policy explicitly (see §5 + checklist #18). A failed artifact gate should stop the run or re-run the upstream phase, not silently continue down a broken dependency 
+chain. (§6 Guardrails) |
 
 **6B.1 Execution internals: subprocess wait & timeouts (why #6 matters)**
 Each phase's `command` runs in a child process (a temp `.cmd` on Windows). The executor
@@ -575,7 +605,7 @@ Each phase's `command` runs in a child process (a temp `.cmd` on Windows). The e
 
 ---
 
-## 7. Anti-patterns — "wrong plans" and the fix
+## 8. Anti-patterns — "wrong plans" and the fix
 
 | # | Wrong plan | Why it breaks | Fix |
 |---|---|---|---|
@@ -592,11 +622,12 @@ Each phase's `command` runs in a child process (a temp `.cmd` on Windows). The e
 | 11 | Duplicate `id`s | Breaks resume/checkpoint | Unique ids only |
 | 12 | `run-phase.ps1` uses `UseShellExecute = $false` to launch opencode | npm `.cmd` shim is invisible to `Process.Start` | Set `UseShellExecute = $true` in the script |
 | 13 | `type ".\STATE.md"` (quoted relative) | Stale — the temp `.cmd` file fix preserves quotes. `.\` prefix is unnecessary, not broken. | Use `type STATE.md` (no prefix) for clearest read-state |
-| 14 | `--agent <read-only>` on a `produces:`-gated write phase | The persona (e.g. `code-reviewer`) has no file-write tool; told to "write X.md" but only prints to stdout → file never appears → `produces:` FAILs (or the phase runs blind). | Verify each agent's write permission before assigning artifact output (§6B.0). For read-only personas, redirect stdout to the artifact (`> .build/x.md`); for write phases use the default agent. |
+| 14 | `--agent <read-only>` on a `produces:`-gated write phase | The persona (e.g. `code-reviewer`) has no file-write tool; told to "write X.md" but only prints to stdout → file never appears → `produces:` FAILs (or the phase 
+runs blind). | Verify each agent's write permission before assigning artifact output (§7B.0). For read-only personas, redirect stdout to the artifact (`> .build/x.md`); for write phases use the default agent. |
 
 ---
 
-## 8. Pre-flight checklist
+## 9. Pre-flight checklist
 
 Before saving a plan, confirm:
 
@@ -614,14 +645,15 @@ Before saving a plan, confirm:
 - [ ] Design phase prompts include "read the real source types and do not invent fields"
 - [ ] No source edits unless L2 is enabled
 - [ ] Did not hand-author `status`/`durationMs`/`completedAt`
-- [ ] **#17** Every `--agent` used in a generative/write phase has file-write permission — cross-check each agent's tool capabilities against its `produces:` (§6B.0 / §7 #14)
+- [ ] **#17** Every `--agent` used in a generative/write phase has file-write permission — cross-check each agent's tool capabilities against its `produces:` (§7B.0 / §8 #14)
 - [ ] **#18** `produces:`-failure behavior is decided — does the loop **halt** the run, or continue down a broken dependency chain? (failure mode #8)
-- [ ] **#19** Worktree path == downstream `--dir` — if a code phase creates a git worktree, every subsequent phase `--dir`s into the worktree, not the original target (§5.1 / failure mode #7)
-- [ ] **#20** Subprocess timeout < plan timeout — the inner `opencode run` has its own latency; the phase `timeoutMs` must be ≥ the inner LLM's max execution time, and the executor must have its own subprocess kill timeout (§6B.1 / failure mode #6)
+- [ ] **#19** Worktree path == downstream `--dir` — if a code phase creates a git worktree, every subsequent phase `--dir`s into the worktree, not the original target (§6.1 / failure mode #7)
+- [ ] **#20** Subprocess timeout < plan timeout — the inner `opencode run` has its own latency; the phase `timeoutMs` must be ≥ the inner LLM's max execution time, and the executor must have its own subprocess kill timeout 
+(§7B.1 / failure mode #6)
 
 ---
 
-## 9. Where this lives
+## 10. Where this lives
 
 `agent-loop/PLAN-WRITING-GUIDE.md`, referenced from `AGENTS.md` so the loop loads it
 automatically before every run. Update this guide when the executor schema changes

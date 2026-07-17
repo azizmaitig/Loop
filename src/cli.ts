@@ -35,6 +35,7 @@ Commands:
   start                        Run loop (phases/task)
   daemon                       Run as persistent daemon (no task execution yet)
   init                         Scaffold STATE.md, LOOP.md, AGENTS.md
+  validate                     Check a .plan.yaml against the structural schema
 
 Options:
   --phases <name1,name2,...>   Run named phases from the built-in task
@@ -113,6 +114,9 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
         break;
       case 'daemon':
         subcommand = 'daemon';
+        break;
+      case 'validate':
+        subcommand = 'validate';
         break;
       case '--phases': {
         const val = rawArgs[++i];
